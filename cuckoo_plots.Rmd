@@ -1,0 +1,50 @@
+---
+title: "Cuckoo movements"
+author: "MM"
+date: "7 February 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+```{r cuckoos, echo=FALSE, warning=FALSE, message=FALSE}
+########################
+
+rm(list=ls())
+library(maps)
+library(sp)
+library(maptools)
+library(rgdal)
+library(ggplot2)
+library(ggmap)
+
+# using best of day data
+dat2<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers.csv", h=T)
+
+
+# hack to put months in correct numeric order
+dat2$month2<-ifelse(dat2$month>9, dat2$month, paste(0, dat2$month, sep=""))
+dat2$yrmo<-as.numeric(paste(dat2$year.x, dat2$month2, sep="."))
+
+m1 <- get_map(location = "Nigeria", zoom=4)
+
+
+for(i in unique(dat2$ptt))
+{
+  
+  
+  g<-ggmap(m1)+
+    geom_line(data=dat2[dat2$ptt==i,], aes(x=long, y=lat,
+                                             colour=factor(yrmo)))+
+    geom_jitter(data=dat2[dat2$ptt==i,], aes(x=long, y=lat,
+                colour=factor(yrmo)), shape=1, width = 1, height= 1)+ggtitle(i)
+  
+  print(g)
+}
+  
+  
+```
+
