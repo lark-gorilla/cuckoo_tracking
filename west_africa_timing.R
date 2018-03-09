@@ -121,10 +121,67 @@ UK_travel$unreliable_exit<-unlist(by(UK_travel, UK_travel$ptt, FUN=function(x) {
 
 write.csv(UK_travel, "~/BTO/cuckoo_tracking/data/complete_cycles_UK_timing.csv", quote=F, row.names=F)
 
+# OK we need better than just arrival into the UK, no add arrival at breeding ground
+# this is defined as a 10km buffer around breeding stopovers from the best of day data
+# these data are read in from shapefile created in qgis
+
+# read in necessary datatsets
+library(rgdal)
+
+setwd("~/BTO/cuckoo_tracking/data/")
+breeding_site<-readOGR(layer="complete_cycle_cuckoo_breeding_buffers",
+               dsn="spatial") # different linux/windows
+
+UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_timing.csv", h=T)
+hires<-read.csv("~/BTO/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_clean.csv", h=T)
+
+# loop will run per ptt and isolate points within breeding buffers
+# then, per year pull the first and last points
+
+breeding_timing<-NULL
+for(i in gd_cucks)
+{
+  pttSP<-SpatialPointsDataFrame(
+    SpatialPoints(cbind(hires[hires$ptt==i,]$location.long,
+                        hires[hires$ptt==i,]$location.lat), 
+                        CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")),
+                                data=hires[hires$ptt==i,]) 
+  
+  breedingpts<-pttSP[breeding_site[breeding_site$ptt==i,],]@data
+  
+  breedingpts$timestamp <- as.POSIXct(strptime(breedingpts$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+  m1<-data.frame(ptt=i,year=aggregate(timestamp~year.x, breedingpts, min)[,1],
+                 breeding_entry=aggregate(timestamp~year.x, breedingpts, min)[,2],
+                 breeding_exit=aggregate(timestamp~year.x, breedingpts, max)[,2])
+  
+  breeding_timing<-rbind(breeding_timing, m1)
+}
+
+
+library(plyr)
+
+UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_timing.csv", h=T)
+
+travel2<-join_all(list(UK_travel, breeding_timing), by=c("ptt", "year"))
+
+# first NA in breeding times is fine as he bolted after deployment, the other one 
+# is because tracker died just at breeing location so manually fill
+travel2[45,7:8]<-travel2[45,3:4]
+travel2[1,7:8]<-travel2[1,3:4]
+
+#write out
+write.csv(travel2,"~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", quote=F, row.names=F)
+
 # have a look
 
-UK_travel$UK_entryHACK<-as.Date(paste("2000",
-  substr(UK_travel$UK_entry,5,11), sep=""))
+travel2$UK_entryHACK<-as.Date(paste("2000",
+  substr(travel2$UK_entry,5,11), sep=""))
+
+travel2$breeding_entryHACK<-as.Date(paste("2000",
+  substr(travel2$breeding_entry,5,11), sep=""))
+
+travel2$UK_entry-travel2$breeding_entry
 
 #d_limit<-c(min(UK_travel[UK_travel$deployment_entry==FALSE,]$UK_entryHACK),
 #          max(UK_travel[UK_travel$deployment_entry==FALSE,]$UK_entryHACK))
