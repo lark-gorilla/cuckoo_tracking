@@ -173,15 +173,20 @@ travel2[1,7:8]<-travel2[1,3:4]
 #write out
 write.csv(travel2,"~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", quote=F, row.names=F)
 
+#Read in again but this time call UK_travel
+UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
+
 # have a look
 
-travel2$UK_entryHACK<-as.Date(paste("2000",
-  substr(travel2$UK_entry,5,11), sep=""))
+UK_travel$UK_entryHACK<-as.Date(paste("2000",
+  substr(UK_travel$UK_entry,5,11), sep=""))
 
-travel2$breeding_entryHACK<-as.Date(paste("2000",
-  substr(travel2$breeding_entry,5,11), sep=""))
+UK_travel$breeding_entryHACK<-as.Date(paste("2000",
+  substr(UK_travel$breeding_entry,5,11), sep=""))
 
-travel2$UK_entry-travel2$breeding_entry
+# difference between arrival in UK and arrival in
+UK_travel$UK_br_diff_days<-
+  UK_travel$breeding_entryHACK-UK_travel$UK_entryHACK
 
 #d_limit<-c(min(UK_travel[UK_travel$deployment_entry==FALSE,]$UK_entryHACK),
 #          max(UK_travel[UK_travel$deployment_entry==FALSE,]$UK_entryHACK))
@@ -189,28 +194,30 @@ travel2$UK_entry-travel2$breeding_entry
 # need to specify limits bit further from the data otherwise it
 # cuts bits off the plot
 
-d_limit<-as.Date(c("2000-04-11", "2000-05-22"))
+summary(UK_travel[UK_travel$deployment_entry
+                  ==FALSE,]$breeding_entryHACK)
+
+d_limit<-as.Date(c("2000-04-12", "2000-05-24"))
 
 p<-ggplot(data=UK_travel[UK_travel$deployment_entry==FALSE,], 
-          aes(x=UK_entryHACK))
+          aes(x=breeding_entryHACK))
 
 p1<-p+geom_histogram(binwidth=1, col='black' )+facet_wrap(~year)+
           scale_x_date(limits=d_limit, 
           date_breaks = "1 week", 
           date_minor_breaks = "1 day",
           date_labels = "%b %d")
-          
 
-jpeg("~/BTO/cuckoo_tracking/outputs/UK_return_years.jpg",
+jpeg("~/BTO/cuckoo_tracking/outputs/breeding_start_years.jpg",
      width = 12, height =6 , units ="in", res =300)
 p1
 dev.off()
 
-aggregate(UK_entryHACK~year,
-UK_travel[UK_travel$deployment_entry==FALSE,], mean)
+aggregate(breeding_entryHACK~year,
+          UK_travel[UK_travel$deployment_entry==FALSE,], median)
 
-aggregate(UK_entryHACK~year,
-UK_travel[UK_travel$deployment_entry==FALSE,], sd)
+aggregate(breeding_entryHACK~year,
+          UK_travel[UK_travel$deployment_entry==FALSE,], sd)
 #  year mean    sd
 # 2012  30/04  0.7071068
 # 2013  28/04  4.0414519
@@ -219,13 +226,47 @@ UK_travel[UK_travel$deployment_entry==FALSE,], sd)
 # 2016  28/04  6.5246784
 # 2017  01/05  12.5286339
 
+# do some statistical tests
+
+library(lubridate)
+
+UK_travel$breeding_entryDOY<-yday(
+  UK_travel$breeding_entry) # not the HACK version
+
+hist(UK_travel[UK_travel$deployment_entry==FALSE,]$breeding_entryDOY)
+
+library(lme4)
+
+m1<-lmer(breeding_entryDOY~year+(1|ptt),
+     data=UK_travel[UK_travel$deployment_entry==FALSE,])
+
+UK_travel$yearFACT <-factor(UK_travel$year)
+UK_travel$yearFACT <- relevel(UK_travel$yearFACT, ref="2015")
+
+m2<-lmer(breeding_entryDOY~yearFACT+(1|ptt),
+         data=UK_travel[UK_travel$deployment_entry==FALSE,])
+
+library(car)
+Anova(m1, test.statistic = 'F')
+
+Anova(m2, test.statistic = 'F')
+
+# no differences
+
+m3<-lm(breeding_entryDOY~yearFACT+factor(ptt),
+         data=UK_travel[UK_travel$deployment_entry==FALSE,])
+
+# nope
+
+UK_travel$year <- relevel(UK_travel$year, ref="2015")
+
 p1<-p+geom_histogram(binwidth=1, col='black' )+facet_wrap(~ptt)+
   scale_x_date(limits=d_limit, 
                date_breaks = "1 week", 
                date_minor_breaks = "1 day",
                date_labels = "%b %d")
 
-jpeg("~/BTO/cuckoo_tracking/outputs/UK_return_birds.jpg",
+jpeg("~/BTO/cuckoo_tracking/outputs/breeding_start_birds.jpg",
      width = 15, height =6 , units ="in", res =300)
 p1
 dev.off()
