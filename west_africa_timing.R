@@ -307,12 +307,9 @@ aggregate(UK_entryHACK~ptt,
 
 # join stopover data and UK_travel summary table
 
-UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_timing.csv", h=T)
+UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
 
 dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_bestofday_complete_cycles.csv", h=T)
-
-UK_travel$UK_entryHACK<-as.Date(paste("2000",
-              substr(UK_travel$UK_entry,5,11), sep=""))
 
 
 library(plyr)
@@ -357,10 +354,9 @@ d3$SO_startHACK<-as.Date(paste("2000",
 library(ggplot2)
 
 p<-ggplot(data=d3[d3$deployment_entry!=TRUE & d3$stage=="migration" ,],
-          aes(x=SO_endHACK, y=UK_entryHACK,
+          aes(x=SO_endHACK, y=breeding_entryHACK,
               colour=factor(ptt), shape=region))
-p1<-p+geom_point()+geom_line()+facet_wrap(~year)
-
+p1<-p+geom_point(aes(size=SO_days))+geom_line()+facet_wrap(~year)
 
 
 # so do birds go further west within west africa in relation to date
@@ -395,20 +391,54 @@ by_obj<-by(d3[d3$region=="tropical_Africa",],
 d4<-do.call(rbind, by_obj) # whay!
 # alternate apprach using ddply from plyr? could get to work
 
-p<-ggplot(data=d4,aes(x=SO_median_long, y=SO_startHACK))
-          
-p1<-p+geom_point(aes(colour=factor(year)))+scale_x_date(date_breaks = "1 week", 
-                           date_minor_breaks = "1 day",
-                           date_labels = "%b %d")+
-  scale_y_date(date_breaks = "1 week", 
-               date_minor_breaks = "1 day",
-               date_labels = "%b %d")+geom_smooth(method="lm")
+library(lubridate)
 
-jpeg("~/BTO/cuckoo_tracking/outputs/Africa_UK_spring_timing.jpg",
+d4$breeding_entryDOY<-yday(
+  d4$breeding_entry) 
+
+d4$SO_startDOY<-yday(
+  d4$SO_start) 
+
+p<-ggplot(data=d4,aes(x=SO_startDOY, y=breeding_entryDOY))
+          
+p1<-p+geom_point(aes(colour=factor(year)))+
+  geom_smooth(method="lm")
+
+jpeg("~/BTO/cuckoo_tracking/outputs/Africa_UKbreeding_spring_timing.jpg",
      width = 10, height =6 , units ="in", res =300)
 p1
 dev.off()
 
+#stats
+
+cor(d4$SO_startDOY, d4$breeding_entryDOY)
+
+m4<-lmer(breeding_entryDOY~
+           SO_startDOY*factor(year)+(1|ptt),data=d4)
+
+Anova(m4, test.statistic = 'F')
+
+m4<-lmer(breeding_entryDOY~
+           SO_startDOY+(1|year)+(1|ptt),data=d4)
+
+Anova(m4, test.statistic = 'F')
+
+m5<-lmer(breeding_entryDOY~
+           SO_startDOY*factor(year)+(1|ptt),
+         data=d4[d4$SO_startDOY>60,])
+
+Anova(m5, test.statistic = 'F')
+
+p<-ggplot(data=d4[d4$SO_startDOY>60,]
+          ,aes(x=SO_startDOY, y=breeding_entryDOY))
+
+p1<-p+geom_point(aes(colour=factor(year)))+
+  geom_smooth(method="lm")
+
+# Now transit time from W Africa to breeding place 
+# tested against day of year,year, longitude and latitude
+# transit time defined as time between last point
+# in w africa (d4) and arrival at breeding location
 
 p1<-p+geom_point(aes(colour=SO_median_long))+scale_x_date(date_breaks = "1 week", 
          date_minor_breaks = "1 day",
