@@ -108,9 +108,10 @@ writeOGR(obj=stopovers_spdf, dsn="spatial",
          layer="movebank_cuckoos_bestofday_stopovers", driver="ESRI Shapefile",
          overwrite_layer = T)
   
+
 # To create master spredsheet with stopovers for Chris
 
-dat<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers.csv", h=T)
+dat<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_clean_stopovers.csv", h=T)
 
 # FORMAT!!
 dat$timestamp <- as.POSIXct(strptime(dat$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -125,16 +126,24 @@ for(i in birds)
   # for each bird give the mgroups which are not migratory ones
   bird_out<-NULL
   
-  mgz<-na.omit(unique(dat[dat$ptt==i & dat$mtype!="M",]$mgroup))
+  mgz<-na.omit(unique(dat[dat$ptt==i & dat$mtype=="S",]$mgroup))
+  # removes 'M' migratory and 'C' deployment point
   
   for (j in mgz)
   {
     ptt_mgroup<-dat[dat$ptt==i & dat$mgroup==j,]
     
     ########## Drops stopovers with only two locations ########
-    if(nrow(ptt_mgroup)<3){next}
+    #if(nrow(ptt_mgroup)<3){next}
     ###########################################################
 
+    ########## Allows a stopover to be defined based on time #
+    # Here we use 1 hour - we're doing this on non duty-cycle data 
+    # as it gives more accurate timings 
+    
+    if(unique(ptt_mgroup$LOS)<1){next}
+    
+    ###########################################################
     
     ptt_mgroup_out<-data.frame(ptt=i, name=unique(ptt_mgroup$name), mgroup=j, 
                                 SO_start=min(ptt_mgroup$timestamp),
@@ -156,7 +165,7 @@ for(i in birds)
   
 }  
 
-write.csv(stopovers_tab, "~/BTO/cuckoo_tracking/data/stopover_table_bestofday.csv", quote=F, row.names=F)
+write.csv(stopovers_tab, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin.csv", quote=F, row.names=F)
 
 # Add country and biome data to stopovers
 
@@ -169,7 +178,7 @@ library(ggplot2)
 library(ggmap)
 
 # using best of day data
-dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_table_bestofday.csv", h=T)
+dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_table_1daymin.csv", h=T)
 
 setwd("~/BTO/cuckoo_tracking/sourced_data/")
 countries<-readOGR(layer="TM_WORLD_BORDERS-0.3",
@@ -205,7 +214,32 @@ dat$biome1<-gsub(",", "", dat$biome1)
 
 dat$biome2<-gsub(",", "", dat$biome2)
 
-write.csv(dat, "~/BTO/cuckoo_tracking/data/stopover_table_bestofday_biomes.csv", quote=F, row.names=F)
+write.csv(dat, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin_biomes.csv", quote=F, row.names=F)
 
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel
+
+
+# Exporting as KML files 
+
+setwd("~/BTO/cuckoo_tracking/data")
+
+stopovers<-readOGR(layer="movebank_cuckoos_bestofday_stopovers",
+                dsn="spatial") #
+
+stopovers2<-readOGR(layer="movebank_cuckoos_bestofday_stopover_medianpoints",
+                   dsn="spatial") #
+
+linez<-readOGR(layer="movebank_cuckoos_lines",
+                   dsn="spatial") #
+
+setwd("~/BTO/cuckoo_tracking/data/spatial")
+
+writeOGR(linez, "cuckoo_tracks.kml", "spatial", driver="KML", overwrite_layer=T)
+
+writeOGR(stopovers, "bestofday_stopovers.kml", "spatial", driver="KML", overwrite_layer=T)
+
+writeOGR(stopovers2, "bestofday_stopovers_centroids.kml", "spatial", driver="KML", overwrite_layer=T)
+
+# may be different in windows! Check it puts the file
+# in the right place and not somewhere lower/higher in directory
