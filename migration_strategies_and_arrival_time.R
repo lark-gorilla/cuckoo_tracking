@@ -4,6 +4,13 @@
 
 ### 1) Create summary master table for hypotheses testing
 
+# First we need to use the non-best of day dataset and re-define 
+# what we are calling a stopovr. previously we used => 3 days, as per
+# the nature paper so need something smaller
+
+
+#### OLD
+
 d3<-read.csv("~/BTO/cuckoo_tracking/data/stopover_bestofday_spring_mig.csv", h=T)
 
 d3<-na.omit(d3)
