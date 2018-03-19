@@ -20,6 +20,10 @@ UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.cs
 # Add columns to subset for birds that do a complete cycle
 
 library(plyr)
+
+#re-define year so that it is the year that the stopover starts in
+dat2$SO_year=as.numeric(substr(dat2$SO_start, 1,4))
+
 dat2<-rename(dat2, c("SO_year" = "year"))
 
 d2<-join_all(list(dat2, UK_travel), by=c("ptt", "year"))
@@ -60,7 +64,16 @@ d2<-rename(d2, c("mig_cohort2"="mig_cohort"))
 # summary table of min lat SO dates per year thehn join back
 # winertierng SO timing end
 
-d3<-d2[d2$deployment_entry==FALSE,]
+dt_of_min_lat<-ddply(d2, .(ptt, mig_cohort), .fun =
+        function(x){c(x[x$SO_median_lat==min(x$SO_median_lat),]$SO_start,
+                      x[x$SO_median_lat==min(x$SO_median_lat),]$SO_end)})
+          
+d2.5<-join_all(list(d2, dt_of_min_lat), by=c("ptt", "mig_cohort"))
+
+d2.5<-rename(d2.5, c("V1"="winterSO_start",
+                 "V2"="winterSO_end"))
+
+d3<-d2.5[d2.5$deployment_entry==FALSE,]
 # removes stopovers that are joined to UK deployment
 # years i.e. deployment to Autumn migration e.g. 2011
 
@@ -70,38 +83,96 @@ d4<-d3[d3$is_spring_mig==TRUE,]
 # and year we basically have the calender year
 # as a cutoff point.
 
+d4$key<-NULL
+d4$UK_entryHACK<-NULL
+d4$breeding_entryHACK<-NULL
+d4$is_spring_mig<-NULL
+d4$deployment_entry<-NULL
+d4$unreliable_exit<-NULL
 # write out data
 write.csv(d4, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", quote=F, row.names=F)
 
-# Now join in extra metadata to create master file
-# tidy to remove uneeded columns
 
-library(lubridate)
+# NOW create master file, 1 row per bird and migration 
 
-d4$breeding_entryDOY<-yday(
-  d4$breeding_entry) 
+d4<-read.csv("~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
 
-d4$SO_startDOY<-yday(
-  d4$SO_start) 
-
-d4$SO_endDOY<-yday(
-  d4$SO_end) 
+d4$SO_start <- as.POSIXct(strptime(d4$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
+d4$SO_end <- as.POSIXct(strptime(d4$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
+d4$UK_entry <- as.POSIXct(strptime(d4$UK_entry, "%Y-%m-%d %H:%M:%S"), "UTC")
+d4$UK_exit <- as.POSIXct(strptime(d4$UK_exit, "%Y-%m-%d %H:%M:%S"), "UTC")
 
 
-# sort to regions
+# classify countries into migratory regions
+
 table(d4$country)
 library(maps)
 plot(SO_median_lat~SO_median_long, d4)
 map("world", add=T,  col=3)
 
-d4$region<-"N_Africa_Europe"
-d4[d4$country=="United Kingdom",]$region<-"UK"
-d4[d4$SO_median_lat<20,]$region<-"tropical_Africa"
+# has to be date as timestamp is out by 1 hr.. UTC vs BST??
+d4$region<-ifelse(as.Date(d4$SO_start) >= as.Date(d4$UK_entry) &
+                  as.Date(d4$SO_start) <= as.Date(d4$UK_exit),
+                  "UK", "Europe" )
+
+d4[d4$country %in% c("Algeria","Morocco"
+                     ),]$region<-"North Africa"
 
 
+d4[d4$country %in% c("Togo","Cote d'Ivoire","Ghana",
+                    "Nigeria","Burkina Faso", "Guinea",
+                    "Sierra Leone"),]$region<-"West Africa"
 
+
+d4[d4$country %in% c("Congo","Cameroon",
+                     "Central African Republic",
+                     "Democratic Republic of the Congo",
+                     "Angola", "Gabon"),]$region<-"Central Africa"
+
+plot(SO_median_lat~SO_median_long, d4, col=factor(region))
+map("world", add=T,  col="grey")
+
+
+# finally define the length of a stopover
+
+hist(d4$SO_days)
+
+d4[d4$SO_days<1,] # ok none
+
+nrow(d4)
+nrow(d4[d4$SO_days<3,]) # old appraoch lost ~ 25% of stopovers
 
 # OK now just want last stopover in west africa before bird flew
+
+ddply(d4, .(ptt, year, region), depart=max(SO_end))
+
+out_tab<-ddply(d4, .(ptt, year, region), summarize,
+               depart=max(SO_end), no_SO=length(SO_end),
+               sum_SO=sum(SO_days))
+
+out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
+            arrive_uk=unique(UK_entry), arrive_breeding=unique(breeding_entry))
+            
+
+out2.5<-join_all(list(out2, out_tab[out_tab$region=="Central Africa",]),
+               by=c("ptt", "year"))
+region<-NULL
+out2.5<-rename(out2.5, c("depart"="depart_CentralAF",
+                     "no_SO"="no_SO_CentralAF",
+                     "sum_SO"="sum_SO_CentralAF"))
+
+out3<-join_all(list(out2.5, out_tab[out_tab$region=="West Africa",]),
+                 by=c("ptt", "year"))
+
+
+
+library(reshape2)
+
+
+
+# Now join in extra metadata to create master file
+# tidy to remove uneeded columns
+
 
 by_obj<-by(d3[d3$region=="tropical_Africa",], 
            list(d3[d3$region=="tropical_Africa",]$ptt, 
