@@ -32,10 +32,33 @@ d2$SO_start <- as.POSIXct(strptime(d2$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 d2$SO_end <- as.POSIXct(strptime(d2$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
 d2$UK_entry <- as.POSIXct(strptime(d2$UK_entry, "%Y-%m-%d %H:%M:%S"), "UTC")
 
+d2$SO_month<-NULL
+
+library(lubridate)
+
+d2$SO_startDOY<-yday(
+  d2$SO_start) 
+
+d2$SO_endDOY<-yday(
+  d2$SO_end) 
+
 d2$is_spring_mig<-ifelse(d2$SO_start<d2$UK_entry, TRUE, FALSE)
+
+# add the migration_cohort column
+
+d2$mig_cohort<-ifelse(d2$is_spring_mig==FALSE, d2$year, d2$year-1)
+#
+d2$mig_cohort2<-ifelse(d2$is_spring_mig==TRUE &
+                         d2$deployment_entry==TRUE,
+                       d2$mig_cohort+1, d2$mig_cohort)
+d2$mig_cohort<-NULL
+d2<-rename(d2, c("mig_cohort2"="mig_cohort"))
 
 # two importatnt subsets to run here that basically do
 # the same thing but catch each other's stragglers
+
+# summary table of min lat SO dates per year thehn join back
+# winertierng SO timing end
 
 d3<-d2[d2$deployment_entry==FALSE,]
 # removes stopovers that are joined to UK deployment
@@ -47,41 +70,36 @@ d4<-d3[d3$is_spring_mig==TRUE,]
 # and year we basically have the calender year
 # as a cutoff point.
 
+# write out data
 write.csv(d4, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", quote=F, row.names=F)
 
-
-
-# write out data
-
-
-
-#### OLD
-
-d3<-read.csv("~/BTO/cuckoo_tracking/data/stopover_bestofday_spring_mig.csv", h=T)
-
-d3<-na.omit(d3)
+# Now join in extra metadata to create master file
+# tidy to remove uneeded columns
 
 library(lubridate)
 
-d3$breeding_entryDOY<-yday(
-  d3$breeding_entry) 
+d4$breeding_entryDOY<-yday(
+  d4$breeding_entry) 
 
-d3$SO_startDOY<-yday(
-  d3$SO_start) 
+d4$SO_startDOY<-yday(
+  d4$SO_start) 
 
-d3$SO_endDOY<-yday(
-  d3$SO_end) 
+d4$SO_endDOY<-yday(
+  d4$SO_end) 
 
 
 # sort to regions
-table(d3$country)
+table(d4$country)
 library(maps)
-plot(SO_median_lat~SO_median_long, d3)
+plot(SO_median_lat~SO_median_long, d4)
 map("world", add=T,  col=3)
 
-d3$region<-"N_Africa_Europe"
-d3[d3$country=="United Kingdom",]$region<-"UK"
-d3[d3$SO_median_lat<20,]$region<-"tropical_Africa"
+d4$region<-"N_Africa_Europe"
+d4[d4$country=="United Kingdom",]$region<-"UK"
+d4[d4$SO_median_lat<20,]$region<-"tropical_Africa"
+
+
+
 
 # OK now just want last stopover in west africa before bird flew
 
