@@ -187,9 +187,10 @@ out4<-rename(out4, c("depart"="DEPeurope",
 # tidy to remove uneeded columns
 
 strategy.dat <- read.csv("~/BTO/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
-strategy.dat<-rename(strategy.dat, c("tag"="ptt"))
 
-out5<-join_all(list(out4, data.frame(ptt=strategy.dat$ptt, breeding_loc=strategy.dat$capture.location)),by=c("ptt"))
+
+out5<-join(x=out4, y=data.frame(ptt=strategy.dat$tag, 
+                                breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
 
 # rearrange with dplyr
 library(dplyr)
@@ -200,7 +201,170 @@ out6<-out5 %>% select(ptt, breeding_loc, year, depart_winterSO, DEPcentralAF,
                 noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope)
 
 # make stopovers duration and numer a zero when they don't occur
-out6[,11:16][is.na(out6[,11:16])]<-"0"
+out6[,11:18][is.na(out6[,11:18])]<-"0"
 
 write.csv(out6, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", quote=F, row.names=F)
 
+
+##################################################
+###### Now stats
+##################################################
+
+dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", h=T)
+
+dat$depart_winterSO <- as.POSIXct(strptime(dat$depart_winterSO, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$DEPcentralAF <- as.POSIXct(strptime(dat$DEPcentralAF, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$DEPwestAF <- as.POSIXct(strptime(dat$DEPwestAF, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$DEPnorthAF <- as.POSIXct(strptime(dat$DEPnorthAF, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$DEPeurope <- as.POSIXct(strptime(dat$DEPeurope, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$arrive_uk <- as.POSIXct(strptime(dat$arrive_uk, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$arrive_breeding <- as.POSIXct(strptime(dat$arrive_breeding, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+
+
+library(GGally)
+
+
+#jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr.jpg",
+     width = 24, height =12 , units ="in", res =600)
+ggpairs(dat)
+dev.off()
+
+# ok nice, but too big to visualise in R
+
+library(lubridate)
+
+dat$depart_winterSO.doy <- yday(dat$depart_winterSO)
+# hack to put previous years yday behind
+dat$depart_winterSO.doy<-ifelse(dat$depart_winterSO.doy > 200,
+                                dat$depart_winterSO.doy-365, dat$depart_winterSO.doy)
+                                
+dat$DEPcentralAF.doy <- yday(dat$DEPcentralAF)
+dat$DEPwestAF.doy <- yday(dat$DEPwestAF)
+dat$DEPnorthAF.doy <- yday(dat$DEPnorthAF)
+dat$DEPeurope.doy <- yday(dat$DEPeurope)
+dat$arrive_uk.doy <- yday(dat$arrive_uk)
+dat$arrive_breeding.doy <- yday(dat$arrive_breeding)
+
+
+ #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr2.jpg",
+ #width = 24, height =12 , units ="in", res =600)
+ ggpairs(dat[,11:25])
+ dev.off()
+                 
+ 
+ #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr3.jpg",
+  #    width = 12, height =6 , units ="in", res =300)
+ ggpairs(dat[,19:25])
+ dev.off()
+ 
+ jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr4.jpg",
+ width = 12, height =9 , units ="in", res =300)
+ggpairs(dat[,11:18])
+dev.off()
+ 
+#########################
+######## Modelling
+
+library(lme4)
+library(car)
+
+# Does arrival at breeding location depend on african departures
+
+m1<-lmer(arrive_breeding.doy~factor(year)*depart_winterSO.doy+
+           (1|ptt), data=dat)
+
+m2<-lmer(arrive_breeding.doy~factor(year)*DEPcentralAF.doy+
+           (1|ptt), data=dat)
+
+m3<-lmer(arrive_breeding.doy~factor(year)*DEPwestAF.doy+
+           (1|ptt), data=dat)
+
+anova(m1, m2, m3)
+
+m4<-lmer(arrive_breeding.doy~factor(year)+depart_winterSO.doy+
+           DEPcentralAF.doy+DEPwestAF.doy+
+           (1|ptt), data=dat)
+
+Anova(m4, test.statistic = 'F')
+
+m4a<-lmer(arrive_breeding.doy~factor(year)+depart_winterSO.doy+
+           DEPwestAF.doy+
+           (1|ptt), data=dat)
+
+Anova(m4a, test.statistic = 'F')
+
+m4b<-lmer(arrive_breeding.doy~factor(year)+
+            DEPwestAF.doy+
+            (1|ptt), data=dat)
+
+Anova(m4b, test.statistic = 'F')
+
+m4c<-lmer(arrive_breeding.doy~
+            DEPwestAF.doy+
+            (1|ptt), data=dat)
+
+anova(m4b, m4c)
+
+library(MuMIn)
+r.squaredGLMM(m4)
+r.squaredGLMM(m4b)
+r.squaredGLMM(m4c)
+
+# is arrival determined by population
+
+bl1<-lmer(arrive_breeding.doy~
+            breeding_loc+
+            (1|ptt), data=dat)
+
+Anova(bl1, test.statistic = 'F')
+
+# what about by the length of stopovers in various places
+
+bl2<-lmer(arrive_breeding.doy~
+            sumSOcentralAF+
+            sumSOwestAF+
+            sumSOnorthAF+
+            sumSOeurope+
+            (1|ptt), data=dat)
+
+# nope
+
+# OK so check if departure from various places
+# is related to year
+
+dw<-lmer(depart_winterSO.doy~factor(year)+
+            (1|ptt), data=dat)
+
+Anova(dw, test.statistic = 'F')
+qplot(data=dat, x=depart_winterSO.doy, geom='histogram')+facet_wrap(~year)
+
+dwa<-lmer(DEPwestAF.doy~factor(year)+
+           (1|ptt), data=dat)
+
+Anova(dwa, test.statistic = 'F')
+
+qplot(data=dat, x=DEPwestAF.doy, geom='histogram')+facet_wrap(~year)
+
+# Do number no of or tot length of stopovers 
+# in west africa vary by year
+
+
+sWA<-lmer(sumSOwestAF~factor(year)+
+           (1|ptt), data=dat)
+
+Anova(sWA, test.statistic = 'F')
+qplot(data=dat, x=sumSOwestAF, geom='histogram')+facet_wrap(~year)
+
+# Using number of stopovers in north africa 
+# and europe as a metric of condition
+# do birds that spend longer in west africa 
+# spend less time later on?
+
+SOc<-lmer(sumSOeurope~sumSOwestAF+factor(year)+
+            (1|ptt), data=dat)
+Anova(SOc, test.statistic = 'F')
+
+SOne<-lmer(sumSOeurope~sumSOnorthAF+factor(year)+
+            (1|ptt), data=dat)
+Anova(SOne, test.statistic = 'F')
