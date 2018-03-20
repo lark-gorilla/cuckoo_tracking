@@ -144,8 +144,6 @@ nrow(d4[d4$SO_days<3,]) # old appraoch lost ~ 25% of stopovers
 
 # OK now just want last stopover in west africa before bird flew
 
-ddply(d4, .(ptt, year, region), depart=max(SO_end))
-
 out_tab<-ddply(d4, .(ptt, year, region), summarize,
                depart=max(SO_end), no_SO=length(SO_end),
                sum_SO=sum(SO_days))
@@ -156,30 +154,53 @@ out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
 
 out2.5<-join_all(list(out2, out_tab[out_tab$region=="Central Africa",]),
                by=c("ptt", "year"))
-region<-NULL
-out2.5<-rename(out2.5, c("depart"="depart_CentralAF",
-                     "no_SO"="no_SO_CentralAF",
-                     "sum_SO"="sum_SO_CentralAF"))
+out2.5$region<-NULL
+out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
+                     "no_SO"="noSOcentralAF",
+                     "sum_SO"="sumSOcentralAF"))
 
 out3<-join_all(list(out2.5, out_tab[out_tab$region=="West Africa",]),
                  by=c("ptt", "year"))
 
+out3$region<-NULL
+out3<-rename(out3, c("depart"="DEPwestAF",
+                         "no_SO"="noSOwestAF",
+                         "sum_SO"="sumSOwestAF"))
 
+out3.5<-join_all(list(out3, out_tab[out_tab$region=="North Africa",]),
+               by=c("ptt", "year"))
 
-library(reshape2)
+out3.5$region<-NULL
+out3.5<-rename(out3.5, c("depart"="DEPnorthAF",
+                     "no_SO"="noSOnorthAF",
+                     "sum_SO"="sumSOnorthAF"))
 
+out4<-join_all(list(out3.5, out_tab[out_tab$region=="Europe",]),
+                 by=c("ptt", "year"))
 
+out4$region<-NULL
+out4<-rename(out4, c("depart"="DEPeurope",
+                         "no_SO"="noSOeurope",
+                         "sum_SO"="sumSOeurope"))
 
 # Now join in extra metadata to create master file
 # tidy to remove uneeded columns
 
+strategy.dat <- read.csv("~/BTO/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
+strategy.dat<-rename(strategy.dat, c("tag"="ptt"))
 
-by_obj<-by(d3[d3$region=="tropical_Africa",], 
-           list(d3[d3$region=="tropical_Africa",]$ptt, 
-                d3[d3$region=="tropical_Africa",]$year),
-           FUN=function(x){x[which(x$SO_endDOY==max(x$SO_endDOY)),]})
+out5<-join_all(list(out4, data.frame(ptt=strategy.dat$ptt, breeding_loc=strategy.dat$capture.location)),by=c("ptt"))
 
-d4<-do.call(rbind, by_obj) # whay!
-# alternate apprach using ddply from plyr? could get to work
+# rearrange with dplyr
+library(dplyr)
 
+out6<-out5 %>% select(ptt, breeding_loc, year, depart_winterSO, DEPcentralAF,
+                DEPwestAF, DEPnorthAF, DEPeurope, arrive_uk, arrive_breeding,
+                noSOcentralAF, sumSOcentralAF, noSOwestAF, sumSOwestAF, 
+                noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope)
+
+# make stopovers duration and numer a zero when they don't occur
+out6[,11:16][is.na(out6[,11:16])]<-"0"
+
+write.csv(out6, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", quote=F, row.names=F)
 
