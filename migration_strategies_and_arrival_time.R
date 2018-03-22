@@ -11,9 +11,9 @@
 # Load non best-of-day data which has stopover defined as >= 1 day
 
 
-dat2<-read.csv("~/BTO/cuckoo_tracking/data/stopover_table_1daymin_biomes.csv", h=T)
+dat2<-read.csv("N:/cuckoo_tracking/data/stopover_table_1daymin_biomes.csv", h=T)
 
-UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
+UK_travel<-read.csv("N:/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
 
 #UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
@@ -90,12 +90,12 @@ d4$is_spring_mig<-NULL
 d4$deployment_entry<-NULL
 d4$unreliable_exit<-NULL
 # write out data
-write.csv(d4, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", quote=F, row.names=F)
+write.csv(d4, "N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", quote=F, row.names=F)
 
 
 # NOW create master file, 1 row per bird and migration 
 
-d4<-read.csv("~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
+d4<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
 
 d4$SO_start <- as.POSIXct(strptime(d4$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 d4$SO_end <- as.POSIXct(strptime(d4$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -186,7 +186,7 @@ out4<-rename(out4, c("depart"="DEPeurope",
 # Now join in extra metadata to create master file
 # tidy to remove uneeded columns
 
-strategy.dat <- read.csv("~/BTO/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
+strategy.dat <- read.csv("N:/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
 
 
 out5<-join(x=out4, y=data.frame(ptt=strategy.dat$tag, 
@@ -203,14 +203,14 @@ out6<-out5 %>% select(ptt, breeding_loc, year, depart_winterSO, DEPcentralAF,
 # make stopovers duration and numer a zero when they don't occur
 out6[,11:18][is.na(out6[,11:18])]<-"0"
 
-write.csv(out6, "~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", quote=F, row.names=F)
+write.csv(out6, "N:/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", quote=F, row.names=F)
 
 
 ##################################################
 ###### Now stats
 ##################################################
 
-dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", h=T)
+dat<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", h=T)
 
 dat$depart_winterSO <- as.POSIXct(strptime(dat$depart_winterSO, "%Y-%m-%d %H:%M:%S"), "UTC")
 dat$DEPcentralAF <- as.POSIXct(strptime(dat$DEPcentralAF, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -226,7 +226,7 @@ library(GGally)
 
 
 #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr.jpg",
-     width = 24, height =12 , units ="in", res =600)
+#     width = 24, height =12 , units ="in", res =600)
 ggpairs(dat)
 dev.off()
 
@@ -258,7 +258,7 @@ dat$arrive_breeding.doy <- yday(dat$arrive_breeding)
  ggpairs(dat[,19:25])
  dev.off()
  
- jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr4.jpg",
+ jpeg("N:/cuckoo_tracking/outputs/spring_mig_corr4.jpg",
  width = 12, height =9 , units ="in", res =300)
 ggpairs(dat[,11:18])
 dev.off()
