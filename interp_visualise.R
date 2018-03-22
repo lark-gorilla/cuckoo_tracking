@@ -13,6 +13,13 @@ dat$TrackTime<-as.double(dat$timestamp)
 names(dat)[names(dat)=="lat"]<-"Latitude"
 names(dat)[names(dat)=="long"]<-"Longitude"
 
+dat<-data.frame(ptt=dat$ptt, 
+                Latitude=dat$Latitude, 
+                Longitude=dat$Longitude, 
+                timestamp=dat$timestamp, 
+                TrackTime=dat$TrackTime
+                )
+
 # Interpolation using old seabird code.
 
 ####@@@@ RESAMPLE @@@@####
@@ -32,13 +39,14 @@ for(i in unique(dat$ptt))
   
   resample_output<-resample(Track, timeStep=1)  
   ## timeStep set for 1 hour interval as anything above makes weird
+  resample_output$dup<-duplicated(resample_output$timestamp)
   
   #readline("ok")
   results<-rbind(results,resample_output)
   print(i)
 }
 
-plot(Latitude~Longitude, results, pch=16, cex=0.4, col=Bird_ID)
+plot(Latitude~Longitude, results, pch=16, cex=0.4, col=ptt)
 map("worldHires", add=T, col=3)
 
 results$timestamp<-
@@ -52,33 +60,66 @@ write.csv(results, "~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid
 
 #### Visualisation
 
-results<-read,csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_1hrINTERP.csv", h=T)
-
-library(lubridate)
-
-results$yday<-yday(results$timestamp)
-
-library(ggplot2)
-
-for (in 1:365)
-  
-{
-  
-  
-}
-
+results<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_1hrINTERP.csv", h=T)
 
 UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
 
 UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
-dat2$key<-paste(dat2$ptt, dat2$year.x)
+results$key<-paste(results$ptt, substr(results$timestamp, 1,4))
 
-dat3<-dat2[dat2$key %in% unique(paste(UK_travel$ptt, UK_travel$year)),]
+dat3<-results[results$key %in% unique(paste(UK_travel$ptt, UK_travel$year)),]
 
-dat3<-dat3[dat3$month<6,]
 
-m1 <- get_map(location = c(5, 30), zoom=4)
+library(lubridate)
+
+dat3$yday<-yday(dat3$timestamp)
+dat3$year<-substr(dat3$timestamp, 1,4)
+dat3$week<-week(dat3$timestamp)
+
+library(ggplot2)
+library(ggmap)
+
+# week attempt
+
+m1 <- get_map(location = 'Ghana', zoom=4)
+
+for (i in 1:180)
+  
+{
+  g<-ggmap(m1)+
+    geom_path(data=dat3[dat3$yday<i,], aes(x=Longitude, y=Latitude,
+                                           colour=factor(ptt)))+
+    geom_point(data=dat3[dat3$yday<i,], aes(x=Longitude, y=Latitude,
+                                            colour=factor(ptt)), shape=1)+
+    coord_map(xlim=c((min(dat3[dat3$yday<i,]$Longitude)-0.05),
+                     (max(dat3[dat3$yday<i,]$Longitude)+0.05)),
+              ylim=c((min(dat3[dat3$yday<i,]$Latitude)-0.05),
+                     (max(dat3[dat3$yday<i,]$Latitude)+0.05)))+
+    facet_wrap(~year)
+  
+  
+
+
+
+
+
+m1 <- get_map(location = 'Ghana', zoom=4)
+
+for (i in 1:180)
+  
+{
+  g<-ggmap(m1)+
+    geom_path(data=dat3[dat3$yday<i,], aes(x=Longitude, y=Latitude,
+                                           colour=factor(ptt)))+
+    geom_point(data=dat3[dat3$yday<i,], aes(x=Longitude, y=Latitude,
+                                             colour=factor(ptt)), shape=1)+
+    coord_map(xlim=c((min(dat3[dat3$yday<i,]$Longitude)-0.05),
+                      (max(dat3[dat3$yday<i,]$Longitude)+0.05)),
+              ylim=c((min(dat3[dat3$yday<i,]$Latitude)-0.05),
+                     (max(dat3[dat3$yday<i,]$Latitude)+0.05)))+
+    facet_wrap(~year)
+  
 
 
 for(i in unique(dat3$ptt))
