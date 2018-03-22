@@ -111,7 +111,7 @@ writeOGR(obj=stopovers_spdf, dsn="spatial",
 
 # To create master spredsheet with stopovers for Chris
 
-dat<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_clean_stopovers.csv", h=T)
+dat<-read.csv("N:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
 
 # FORMAT!!
 dat$timestamp <- as.POSIXct(strptime(dat$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -165,7 +165,7 @@ for(i in birds)
   
 }  
 
-write.csv(stopovers_tab, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin.csv", quote=F, row.names=F)
+write.csv(stopovers_tab, "N:/cuckoo_tracking/data/stopover_table_1daymin_recalc.csv", quote=F, row.names=F)
 
 # Add country and biome data to stopovers
 
@@ -178,9 +178,9 @@ library(ggplot2)
 library(ggmap)
 
 # using best of day data
-dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_table_1daymin.csv", h=T)
+dat<-read.csv("N:/cuckoo_tracking/data/stopover_table_1daymin_recalc.csv", h=T)
 
-setwd("~/BTO/cuckoo_tracking/sourced_data/")
+setwd("N:/cuckoo_tracking/sourced_data/")
 countries<-readOGR(layer="TM_WORLD_BORDERS-0.3",
                dsn="country_borders") # different linux/windows
 
@@ -191,12 +191,33 @@ biomes<-readOGR(layer="tnc_terr_ecoregions",
 datSP<-SpatialPointsDataFrame(SpatialPoints(cbind(dat$SO_median_long, dat$SO_median_lat), 
                                             CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")),
                               data=dat)
+
+
+library(sf)
+
+# convert to sf object
+datSP<-st_as_sf(datSP)
+
+class(datSP)
+
+# nice
+plot(datSP)
+
+library(tmap)
+
+tmap_mode('view')
+
+qtm(datSP) #WHHHHHHAATTTTTTTT!!!!
+
+
 dat$country<-"NA"
 dat$biome1<-"NA"
 dat$biome2<-"NA"
 
 for(i in 1:nrow(dat))
 {
+  
+  
   if(identical(paste(countries[datSP[i,],]$NAME), character(0))){
     dat[i,]$country<-"NA"}else{
   dat[i,]$country<-paste(countries[datSP[i,],]$NAME)}
@@ -214,7 +235,7 @@ dat$biome1<-gsub(",", "", dat$biome1)
 
 dat$biome2<-gsub(",", "", dat$biome2)
 
-write.csv(dat, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin_biomes.csv", quote=F, row.names=F)
+write.csv(dat, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin_recalc_biomes.csv", quote=F, row.names=F)
 
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel
