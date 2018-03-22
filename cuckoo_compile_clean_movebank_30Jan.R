@@ -435,25 +435,44 @@ withmovedata.all <- do.call(rbind, withmovedata)
 ####======================== ADD STOPOVER DURATION DATA ======================================
 
 # load functions for calculating LOS; calculate.LOS() and makeLOStable()
-source("~/BTO/cuckoo_tracking/t_drive/scripts/source_scripts/function to add stopover duration data for analysis.R")
+source("N:/cuckoo_tracking/t_drive/scripts/source_scripts/function to add stopover duration data for analysis.R")
 
 withLOSdata <- lapply(withmovedata, calculate.LOS)
 withLOSdata.all <- do.call(rbind, withLOSdata)
 
-plot(lat~long, withLOSdata.all[withLOSdata.all$ptt=="134963",],
-     col=factor(tcycle))
-map("world", add=T)
+####======================== Correct LOS - Hewson nature paper ======================================
 
+# need to extend LOS if next stopover > 1 duty cycle of time away.
+# If so, we assume the bird stayed at the current stopover until
+# the final duty cycle (2 days) prior to the next stopover.
+# Note: we need to consider 'M' classed points as limiters to stopover duration
 
-m1 <- get_map(location = c(lon = mean(withLOSdata.all$long),
-                           lat = mean(withLOSdata.all$lat)), zoom=3)
-g <- ggmap(m1) +geom_point(data =withLOSdata.all, aes(x=long, y=lat, colour=mtype))+
-  facet_wrap(~year.x)
-g
+withLOSdata.all$LOS.recalc<-withLOSdata.all$LOS
 
-jpeg("N:/cuckoo_tracking/stopover_map2.jpg", width=9, height=5, res=600, units="in")
-g
-dev.off()
+for(j in 1:nrow(withLOSdata.all))
+
+  {
+  if(withLOSdata.all[j,]$mgroup==
+     withLOSdata.all[j+1,]$mgroup |
+     is.na(withLOSdata.all[j,]$days.btwn.trans+
+     withLOSdata.all[j+1,]$days.btwn.trans) |
+     withLOSdata.all[j+1,]$days.btwn.trans<3)
+  
+    {next}else{
+              withLOSdata.all[which(withLOSdata.all$ptt==withLOSdata.all[j,]$ptt &
+                          withLOSdata.all$mgroup==withLOSdata.all[j,]$mgroup),]$LOS.recalc<-
+           
+              withLOSdata.all[which(withLOSdata.all$ptt==withLOSdata.all[j,]$ptt &
+                                   withLOSdata.all$mgroup==withLOSdata.all[j,]$mgroup),]$LOS+
+              (withLOSdata.all[j+1,]$days.btwn.trans-2);
+              print(j)
+              }
+    }       
+    
+# check rows which have mtype as "M", LOS as NA but LOS.recalc != NA
+# these are effectively migration lengths, posing as stopovers. 
+# not an issue as we strip them out using dat[dat$mytype!='M",]
+  
 
 ####======================== WRITE FINAL DATA ======================================
 
@@ -464,7 +483,7 @@ rownames(fulloriginal) <- c(1:nrow(fulloriginal))
 
 fulloriginal$mgroup_replicate<-fulloriginal$mgroup
 
-write.csv(fulloriginal, "~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_clean_stopovers.csv", row.names=F, quote=F)
+write.csv(fulloriginal, "N:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", row.names=F, quote=F)
 
 ### Make summary table of stopovers
 
