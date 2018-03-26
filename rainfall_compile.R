@@ -54,12 +54,45 @@ plot(subset(ras, grep("X03",names(ras))))
 # ok looks fine
 
 
+############# VISUALISING rainfall in West Africa ###############
+
+#crop rasters to ROI
+wa_ras<-crop(ras, extent(-17, 33, -17, 26))
+
+# I'm not sure how tmap can facet rasterstacks.. dont think it can so we 
+# convert to SpatialPixelsDataFrame and try using sf
+
+# not sure what I'm doing here
+
+# got excited about the tm_animate thing
+# but am struggling to facet with raster
+# think im making it difficult
+
+# aims: to learn sf, tmap
+# explore how birds and rainfall move
+# lets actually do saome spatial analyses
+# using tidyverse power. also make nice map
+# finally animation is not the be and end all..
+
+c2<-rasterToContourPoly(subset(wa_ras, 1), nclass=10)
+
+
+c1<-cut(subset(wa_ras, 1), breaks=c(0, 200, 400, 600, 800, 1000))
+p1<-rasterToPolygons(c1, dissolve=T)
+
+wa_pix<-as(wa_ras, 'SpatialPixelsDataFrame') # as() very powerful from Raster
+
+# into a 'sf' object
+
+pix_sf<-st_as_sf(wa_pix) # does not accept SpatialGridDataFrame so did Pixels instead
+
 # some plotting using tmap
 library(tmap)
 
 tmap_mode('plot')
 
 d4<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
+
 
 
 
