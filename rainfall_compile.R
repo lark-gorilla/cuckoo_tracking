@@ -9,7 +9,7 @@
 #
 # data accessed via the portal: http://chrsdata.eng.uci.edu
 
-# read in monthly data in netcdf format
+# read in monthly data in netcdf format ok
 
 library(raster)
 
