@@ -9,12 +9,19 @@
 #
 # data accessed via the portal: http://chrsdata.eng.uci.edu
 
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+ if(Sys.info()['nodename']=="D9L5812"){
+   setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+#### !!!!!!!!!!!!!!!!!! ####
+
 # read in monthly data in netcdf format ok
 
-library(raster)
+library(raster) # needs ncdf4 installed
 
 # stacks up all the layers
-ras<-stack("N:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/monthly/PERSIANN_2018-03-26035525am.nc")
+ras<-stack("sourced_data/PERSIANN_rainfall/monthly/PERSIANN_2018-03-26035525am.nc")
 
 # warning in projection 
 
