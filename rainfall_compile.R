@@ -98,7 +98,7 @@ library(tmap)
 
 tmap_mode('plot')
 
-d4<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
+d4<-read.csv("data/stopover_1daymin_spring_mig.csv", h=T)
 
 
 

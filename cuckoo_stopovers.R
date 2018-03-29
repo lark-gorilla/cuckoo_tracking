@@ -111,7 +111,7 @@ writeOGR(obj=stopovers_spdf, dsn="spatial",
 
 # To create master spredsheet with stopovers for Chris
 
-dat<-read.csv("N:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
+dat<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
 
 # FORMAT!!
 dat$timestamp <- as.POSIXct(strptime(dat$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -165,7 +165,7 @@ for(i in birds)
   
 }  
 
-write.csv(stopovers_tab, "N:/cuckoo_tracking/data/stopover_table_1daymin_recalc.csv", quote=F, row.names=F)
+write.csv(stopovers_tab, "data/stopover_table_bestofday_1daymin_recalc.csv", quote=F, row.names=F)
 
 # Add country and biome data to stopovers
 
@@ -178,9 +178,9 @@ library(ggplot2)
 library(ggmap)
 
 # using best of day data
-dat<-read.csv("N:/cuckoo_tracking/data/stopover_table_1daymin_recalc.csv", h=T)
+dat<-read.csv("data/stopover_table_biomes_1daymin_recalc.csv", h=T)
 
-setwd("N:/cuckoo_tracking/sourced_data/")
+setwd("sourced_data/")
 countries<-readOGR(layer="TM_WORLD_BORDERS-0.3",
                dsn="country_borders") # different linux/windows
 
@@ -235,7 +235,7 @@ dat$biome1<-gsub(",", "", dat$biome1)
 
 dat$biome2<-gsub(",", "", dat$biome2)
 
-write.csv(dat, "~/BTO/cuckoo_tracking/data/stopover_table_1daymin_recalc_biomes.csv", quote=F, row.names=F)
+write.csv(dat, "data/stopover_table_bestofday_1daymin_recalc_biomes.csv", quote=F, row.names=F)
 
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel

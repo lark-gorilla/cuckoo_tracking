@@ -8,12 +8,19 @@
 # what we are calling a stopovr. previously we used => 3 days, as per
 # the nature paper so need something smaller
 
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+#### !!!!!!!!!!!!!!!!!! ####
+
 # Load non best-of-day data which has stopover defined as >= 1 day
 
 
-dat2<-read.csv("N:/cuckoo_tracking/data/stopover_table_1daymin_biomes.csv", h=T)
+dat2<-read.csv("data/stopover_table_bestofday_1daymin_recalc_biomes.csv", h=T)
 
-UK_travel<-read.csv("N:/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
+UK_travel<-read.csv("data/complete_cycles_UK_all_timing.csv", h=T)
 
 #UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
@@ -90,12 +97,12 @@ d4$is_spring_mig<-NULL
 d4$deployment_entry<-NULL
 d4$unreliable_exit<-NULL
 # write out data
-write.csv(d4, "N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", quote=F, row.names=F)
+write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
 
 
 # NOW create master file, 1 row per bird and migration 
 
-d4<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig.csv", h=T)
+d4<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig.csv", h=T)
 
 d4$SO_start <- as.POSIXct(strptime(d4$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 d4$SO_end <- as.POSIXct(strptime(d4$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -121,7 +128,7 @@ d4[d4$country %in% c("Algeria","Morocco"
 
 d4[d4$country %in% c("Togo","Cote d'Ivoire","Ghana",
                     "Nigeria","Burkina Faso", "Guinea",
-                    "Sierra Leone"),]$region<-"West Africa"
+                    "Sierra Leone", "Liberia"),]$region<-"West Africa"
 
 
 d4[d4$country %in% c("Congo","Cameroon",
@@ -186,24 +193,85 @@ out4<-rename(out4, c("depart"="DEPeurope",
 # Now join in extra metadata to create master file
 # tidy to remove uneeded columns
 
-strategy.dat <- read.csv("N:/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
+strategy.dat <- read.csv("t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
 
 
 out5<-join(x=out4, y=data.frame(ptt=strategy.dat$tag, 
                                 breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
 
+out6<-join_all(list(out5, data.frame(ptt=strategy.dat$tag, year=strategy.dat$year, 
+                                    autumn_mig=strategy.dat$migratory.strategy)),
+               by=c("ptt", "year"))
+
+# could do with adding more to the mig_strat colum in strategy.dat table
+
+# Finally work out date of Sahara crossing from chat with Chris
+
+allpts<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
+# FORMAT!!
+allpts$timestamp <- as.POSIXct(strptime(allpts$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+#have a quick look for sahara cutoff
+
+# use just birds were interested in 
+
+allpts<-rename(allpts, c("year.x" = "year"))
+
+jpts<-join(x=allpts, y=UK_travel ,type='inner',  by=c("ptt", "year"))
+
+jpts<-jpts[jpts$month %in% 2:5,]
+
+# this line subsets birds and year
+
+jptSP<-SpatialPointsDataFrame(SpatialPoints(cbind(jpts$long, jpts$lat), 
+                                     CRS("+proj=longlat +datum=WGS84 +no_defs +ellps=WGS84 +towgs84=0,0,0")),
+                       data=jpts[,1:3])
+
+jptSP$ptt<-paste0("A",jptSP$ptt)
+
+library(tmap)
+
+tmap_mode('view')
+
+qtm(jptSP, dots.col='ptt')
+
+tm_shape(subset(ras,1), projection=projection(ras), 
+         is.master=T, bbox=extent(-17, 33, -17, 26))+tm_raster()+
+  tm_shape(World)+tm_borders()
+
+# actually don't need to do the recalc has done this for us!!
+
+
+## USE DOY as simplar
+library(lubridate)
+
+out6$depart_winterSO <- yday(out6$depart_winterSO)
+# hack to put previous years yday behind
+out6$depart_winterSO<-ifelse(out6$depart_winterSO > 200,
+                            out6$depart_winterSO-365, out6$depart_winterSO)
+
+out6$DEPcentralAF <- yday(out6$DEPcentralAF)
+out6$DEPwestAF <- yday(out6$DEPwestAF)
+out6$DEPnorthAF <- yday(out6$DEPnorthAF)
+out6$DEPeurope <- yday(out6$DEPeurope)
+out6$arrive_uk <- yday(out6$arrive_uk)
+out6$arrive_breeding <- yday(out6$arrive_breeding)
+
+
 # rearrange with dplyr
+
 library(dplyr)
 
-out6<-out5 %>% select(ptt, breeding_loc, year, depart_winterSO, DEPcentralAF,
+out6<-out6 %>% select(ptt, year, depart_winterSO, DEPcentralAF,
                 DEPwestAF, DEPnorthAF, DEPeurope, arrive_uk, arrive_breeding,
                 noSOcentralAF, sumSOcentralAF, noSOwestAF, sumSOwestAF, 
-                noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope)
+                noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope, breeding_loc,
+                autumn_mig)
 
 # make stopovers duration and numer a zero when they don't occur
-out6[,11:18][is.na(out6[,11:18])]<-"0"
+out6[,10:17][is.na(out6[,10:17])]<-"0"
 
-write.csv(out6, "N:/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", quote=F, row.names=F)
+write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", quote=F, row.names=F)
 
 
 ##################################################
