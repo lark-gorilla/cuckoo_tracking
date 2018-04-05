@@ -153,7 +153,7 @@ nrow(d4[d4$SO_days<3,]) # old appraoch lost ~ 25% of stopovers
 
 out_tab<-ddply(d4, .(ptt, year, region), summarize,
                depart=max(SO_end), no_SO=length(SO_end),
-               sum_SO=sum(SO_days))
+               sum_SO=sum(SO_days), minlongWA=min(SO_median_long))
 
 out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
             arrive_uk=unique(UK_entry), arrive_breeding=unique(breeding_entry))
@@ -162,6 +162,7 @@ out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
 out2.5<-join_all(list(out2, out_tab[out_tab$region=="Central Africa",]),
                by=c("ptt", "year"))
 out2.5$region<-NULL
+out2.5$minlongWA<-NULL
 out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
                      "no_SO"="noSOcentralAF",
                      "sum_SO"="sumSOcentralAF"))
@@ -172,12 +173,14 @@ out3<-join_all(list(out2.5, out_tab[out_tab$region=="West Africa",]),
 out3$region<-NULL
 out3<-rename(out3, c("depart"="DEPwestAF",
                          "no_SO"="noSOwestAF",
-                         "sum_SO"="sumSOwestAF"))
+                         "sum_SO"="sumSOwestAF", 
+                     'minlongWA'='minlongwestAF'))
 
 out3.5<-join_all(list(out3, out_tab[out_tab$region=="North Africa",]),
                by=c("ptt", "year"))
 
 out3.5$region<-NULL
+out3.5$minlongWA<-NULL
 out3.5<-rename(out3.5, c("depart"="DEPnorthAF",
                      "no_SO"="noSOnorthAF",
                      "sum_SO"="sumSOnorthAF"))
@@ -186,6 +189,7 @@ out4<-join_all(list(out3.5, out_tab[out_tab$region=="Europe",]),
                  by=c("ptt", "year"))
 
 out4$region<-NULL
+out4$minlongWA<-NULL
 out4<-rename(out4, c("depart"="DEPeurope",
                          "no_SO"="noSOeurope",
                          "sum_SO"="sumSOeurope"))
@@ -265,7 +269,7 @@ library(dplyr)
 out6<-out6 %>% select(ptt, year, depart_winterSO, DEPcentralAF,
                 DEPwestAF, DEPnorthAF, DEPeurope, arrive_uk, arrive_breeding,
                 noSOcentralAF, sumSOcentralAF, noSOwestAF, sumSOwestAF, 
-                noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope, breeding_loc,
+                noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope,minlongwestAF, breeding_loc,
                 autumn_mig)
 
 # make stopovers duration and numer a zero when they don't occur
@@ -277,6 +281,7 @@ write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv",
 ##################################################
 ###### Now stats
 ##################################################
+
 
 dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", h=T)
 
@@ -362,10 +367,29 @@ dev.off()
 library(lme4)
 library(car)
 
-dat$year<pfactor(dat$year)
-dat$year<-relevel(dat$year, ref='2014')
+dat$year<-as.factor(dat$year)
+#dat$year<-relevel(dat$year, ref='2014')
 
-#m arrival in the uk by year
+# arrival in the uk by year
+
+mean(dat$arrive_breeding);sd(dat$arrive_breeding)
+# 120.9714
+# 8.368308
+
+qplot(data=dat, x=arrive_breeding, geom='histogram')+
+  facet_wrap(~year)+geom_vline(xintercept=120.9, colour='red', linetype='dotted', size=1)
+
+a1<-lmer(arrive_breeding~year+(1|ptt), data=dat)
+
+library(emmeans)
+
+emmeans(a1, specs='year')
+
+Anova(a1, test.statistic = 'F')
+
+#just check median arrival
+
+aggregate(year~arrive_breeding, dat, median)
 
 library(ggplot2)
 qplot(data=dat, x=DEPwestAF, y=arrive_breeding, col=factor(ptt))
@@ -419,6 +443,103 @@ r.squaredGLMM(m4c)
 # Nope
 
 summary(m4b)
+
+# plot
+
+newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
+newdat$p1<-predict(m4b, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
+vcv<-vcov(m4b)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat[dat$DEPwestAF>60,], x=DEPwestAF, y=arrive_breeding)+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')
+  
+#### can we use residuals of model to test anything
+r1<-resid(lmer(arrive_breeding~DEPwestAF+
+                          (1|year), data=dat[dat$DEPwestAF>60,],
+                           na.action=na.exclude), type='pearson')
+
+which(dat$DEPwestAF<60)
+
+r2<-c(r1[1:22], NA, r1[23:length(r1)])
+
+
+dat$m4b_resid<-r2
+
+
+# does amount of time or stopovers in WA affect migration speed?
+
+# shouldnt be using year as random effect as resid model already had year as a RE
+qplot(data=dat, x=noSOwestAF, y=m4b_resid, colour=year)
+
+Anova(lmer(m4b_resid~noSOwestAF+
+           (1|ptt)+(1|year), data=dat), test.statistic = 'F') # mildly significant
+
+Anova(lmer(m4b_resid~sumSOwestAF+
+             (1|ptt)+(1|year), data=dat), test.statistic = 'F')
+
+Anova(lmer(m4b_resid~breeding_loc+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+
+Anova(lmer(m4b_resid~autumn_mig+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+
+qplot(data=dat, x=minlongwestAF, y=m4b_resid)
+
+summary(lmer(m4b_resid~minlongwestAF+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+
+Anova(lmer(m4b_resid~minlongwestAF+(1|ptt)+(1|year),
+           data=dat), test.statistic = 'F')
+
+mr1<- lm(m4b_resid~sumSOwestAF+breeding_loc+minlongwestAF, data=dat)
+
+Anova(mr1, test.statistic = 'F')
+
+# remove the birds that last transmission is in east WA (eg Nigeria), this could be
+# overconservative
+mr2<- lm(m4b_resid~sumSOwestAF+breeding_loc+minlongwestAF,
+         data=dat[dat$minlongwestAF<1,])
+
+Anova(mr2, test.statistic = 'F')# mildly significant
+
+summary(mr2)
+
+qplot(data=dat[dat$minlongwestAF<1,], x=minlongwestAF, y=m4b_resid)+
+  geom_abline(yintercept= -14.4738, slope= 0.7497, colour='red')
+
+summary(lm(m4b_resid~minlongwestAF,
+           data=dat[dat$minlongwestAF<1,]))
+
+
+# nothign really going on.. slope reverses when other factors are removeed..
+
+# one final thing, do faster migrations use a certain route/country?
+# ask what is next stopover after departing west africa
+
+library(dplyr)
+
+d4_naeu<-d4 %>% filter(region=='Europe' | region=='North Africa')
+
+g1<-d4_naeu %>% group_by(ptt, year)
+
+lc1<-g1 %>% summarise(fc=first(country), minlat=min(SO_median_lat))
+lc1$year<-as.factor(lc1$year)
+
+dat2<-left_join(dat, lc1, by=c('ptt', 'year'))
+
+qplot(data=dat2, x=fc, y=m4b_resid, geom='boxplot')
+
+fcm<- lm(m4b_resid~fc,data=dat2)
+
+Anova(fcm, test.statistic = 'F')# mildly significant
+
+summary(fcm)
+
+emmeans(fcm, specs='fc')
 
 
 # is arrival determined by population
