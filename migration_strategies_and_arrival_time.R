@@ -278,16 +278,56 @@ write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv",
 ###### Now stats
 ##################################################
 
-dat<-read.csv("N:/cuckoo_tracking/data/stopover_1daymin_spring_mig_summary.csv", h=T)
+dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", h=T)
 
-dat$depart_winterSO <- as.POSIXct(strptime(dat$depart_winterSO, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$DEPcentralAF <- as.POSIXct(strptime(dat$DEPcentralAF, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$DEPwestAF <- as.POSIXct(strptime(dat$DEPwestAF, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$DEPnorthAF <- as.POSIXct(strptime(dat$DEPnorthAF, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$DEPeurope <- as.POSIXct(strptime(dat$DEPeurope, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$arrive_uk <- as.POSIXct(strptime(dat$arrive_uk, "%Y-%m-%d %H:%M:%S"), "UTC")
-dat$arrive_breeding <- as.POSIXct(strptime(dat$arrive_breeding, "%Y-%m-%d %H:%M:%S"), "UTC")
+### summarise the data
 
+library(dplyr)
+
+years<-group_by(dat, year)
+
+summarise(years, mean(depart_winterSO, na.rm=T), sd(depart_winterSO, na.rm=T), 
+          mean(DEPcentralAF, na.rm=T), sd(DEPcentralAF, na.rm=T), 
+          mean(DEPwestAF, na.rm=T), sd(DEPwestAF, na.rm=T), 
+          mean(DEPnorthAF, na.rm=T), sd(DEPnorthAF, na.rm=T), 
+          mean(DEPeurope, na.rm=T), sd(DEPeurope, na.rm=T), 
+          mean(arrive_breeding, na.rm=T), sd(arrive_breeding, na.rm=T))
+  
+library(reshape2)      
+
+d1<-melt(dat)
+
+d2<-filter(d1, variable=='depart_winterSO'|variable=='DEPcentralAF'|
+             variable=='DEPwestAF'|variable=='DEPnorthAF'|
+             variable=='DEPeurope'|variable=='arrive_breeding')
+
+#jpeg("outputs/spring_mig_timing_year.jpg",
+    width = 12, height =9 , units ="in", res =300)
+
+qplot(data=d2, x=variable, y=value, colour=year, geom='boxplot' )
+
+dev.off()
+
+Anova(lmer(depart_winterSO~year +(1|ptt), data=dat), test.statistic = 'F')
+
+Anova(lmer(DEPcentralAF~year +(1|ptt), data=dat), test.statistic = 'F')
+
+Anova(lmer(DEPwestAF~year +(1|ptt), data=dat), test.statistic = 'F')
+
+Anova(lmer(DEPnorthAF~year +(1|ptt), data=dat), test.statistic = 'F')
+
+Anova(lmer(DEPeurope~year +(1|ptt), data=dat), test.statistic = 'F')
+
+
+d3<-filter(d1, variable=='sumSOcentralAF'|variable=='sumSOwestAF'|
+             variable=='sumSOnorthAF'|variable=='sumSOeurope')
+
+#jpeg("outputs/spring_mig_SOdur_year.jpg",
+width = 12, height =9 , units ="in", res =300)
+
+qplot(data=d3, x=variable, y=value, colour=year, geom='boxplot' )
+
+dev.off()
 
 
 library(GGally)
@@ -300,35 +340,20 @@ dev.off()
 
 # ok nice, but too big to visualise in R
 
-library(lubridate)
-
-dat$depart_winterSO.doy <- yday(dat$depart_winterSO)
-# hack to put previous years yday behind
-dat$depart_winterSO.doy<-ifelse(dat$depart_winterSO.doy > 200,
-                                dat$depart_winterSO.doy-365, dat$depart_winterSO.doy)
-                                
-dat$DEPcentralAF.doy <- yday(dat$DEPcentralAF)
-dat$DEPwestAF.doy <- yday(dat$DEPwestAF)
-dat$DEPnorthAF.doy <- yday(dat$DEPnorthAF)
-dat$DEPeurope.doy <- yday(dat$DEPeurope)
-dat$arrive_uk.doy <- yday(dat$arrive_uk)
-dat$arrive_breeding.doy <- yday(dat$arrive_breeding)
-
-
  #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr2.jpg",
  #width = 24, height =12 , units ="in", res =600)
  ggpairs(dat[,11:25])
  dev.off()
                  
  
- #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr3.jpg",
-  #    width = 12, height =6 , units ="in", res =300)
- ggpairs(dat[,19:25])
+ #jpeg("outputs/spring_mig_departures.jpg",
+      width = 12, height =9 , units ="in", res =300)
+ ggpairs(dat[,3:9])
  dev.off()
  
- jpeg("N:/cuckoo_tracking/outputs/spring_mig_corr4.jpg",
+ #jpeg("outputs/spring_mig_stopover_dur.jpg",
  width = 12, height =9 , units ="in", res =300)
-ggpairs(dat[,11:18])
+ggpairs(dat[,10:17])
 dev.off()
  
 #########################
@@ -337,51 +362,68 @@ dev.off()
 library(lme4)
 library(car)
 
+dat$year<pfactor(dat$year)
+dat$year<-relevel(dat$year, ref='2014')
+
+#m arrival in the uk by year
+
+library(ggplot2)
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding, col=factor(ptt))
+
+
+qplot(data=dat[dat$DEPwestAF>60,], x=DEPwestAF, y=arrive_breeding)+
+  geom_smooth(method='lm')+facet_wrap(~year)
+
+# check multiple year birds
+
+summary(lmer(arrive_breeding~factor(ptt)+
+        (1|year), data=dat[dat$ptt %in% names(which(table(dat$ptt)>1)),]))
+
 # Does arrival at breeding location depend on african departures
 
-m1<-lmer(arrive_breeding.doy~factor(year)*depart_winterSO.doy+
-           (1|ptt), data=dat)
+m4<-lmer(arrive_breeding~depart_winterSO+
+           DEPcentralAF+DEPwestAF+
+           (1|ptt)+(1|year), data=dat[dat$DEPwestAF>60,])
 
-m2<-lmer(arrive_breeding.doy~factor(year)*DEPcentralAF.doy+
-           (1|ptt), data=dat)
+m41<-lmer(arrive_breeding~depart_winterSO+
+           DEPcentralAF+DEPwestAF+
+           (1|year), data=dat[dat$DEPwestAF>60,])
 
-m3<-lmer(arrive_breeding.doy~factor(year)*DEPwestAF.doy+
-           (1|ptt), data=dat)
+anova(m4, m41) # ptt RF doesnt add anything
 
-anova(m1, m2, m3)
 
-m4<-lmer(arrive_breeding.doy~factor(year)+depart_winterSO.doy+
-           DEPcentralAF.doy+DEPwestAF.doy+
-           (1|ptt), data=dat)
+Anova(m41, test.statistic = 'F')
 
-Anova(m4, test.statistic = 'F')
-
-m4a<-lmer(arrive_breeding.doy~factor(year)+depart_winterSO.doy+
-           DEPwestAF.doy+
-           (1|ptt), data=dat)
+m4a<-lmer(arrive_breeding~depart_winterSO+
+           DEPwestAF+
+           (1|year), data=dat[dat$DEPwestAF>60,])
 
 Anova(m4a, test.statistic = 'F')
 
-m4b<-lmer(arrive_breeding.doy~factor(year)+
-            DEPwestAF.doy+
-            (1|ptt), data=dat)
+m4b<-lmer(arrive_breeding~
+            DEPwestAF+
+            (1|year), data=dat[dat$DEPwestAF>60,])
 
 Anova(m4b, test.statistic = 'F')
 
-m4c<-lmer(arrive_breeding.doy~
-            DEPwestAF.doy+
-            (1|ptt), data=dat)
+m4c<-lm(arrive_breeding~
+            DEPwestAF, data=dat[dat$DEPwestAF>60,])
 
+# check if we can drop year randome effect
 anova(m4b, m4c)
 
 library(MuMIn)
-r.squaredGLMM(m4)
+r.squaredGLMM(m41)
 r.squaredGLMM(m4b)
 r.squaredGLMM(m4c)
+# Nope
+
+summary(m4b)
+
 
 # is arrival determined by population
 
-bl1<-lmer(arrive_breeding.doy~
+bl1<-lmer(arrive_breeding~
             breeding_loc+
             (1|ptt), data=dat)
 
@@ -389,7 +431,7 @@ Anova(bl1, test.statistic = 'F')
 
 # what about by the length of stopovers in various places
 
-bl2<-lmer(arrive_breeding.doy~
+bl2<-lmer(arrive_breeding~
             sumSOcentralAF+
             sumSOwestAF+
             sumSOnorthAF+
@@ -401,18 +443,18 @@ bl2<-lmer(arrive_breeding.doy~
 # OK so check if departure from various places
 # is related to year
 
-dw<-lmer(depart_winterSO.doy~factor(year)+
+dw<-lmer(depart_winterSO~factor(year)+
             (1|ptt), data=dat)
 
 Anova(dw, test.statistic = 'F')
-qplot(data=dat, x=depart_winterSO.doy, geom='histogram')+facet_wrap(~year)
+qplot(data=dat, x=depart_winterSO, geom='histogram')+facet_wrap(~year)
 
-dwa<-lmer(DEPwestAF.doy~factor(year)+
+dwa<-lmer(DEPwestAF~factor(year)+
            (1|ptt), data=dat)
 
 Anova(dwa, test.statistic = 'F')
 
-qplot(data=dat, x=DEPwestAF.doy, geom='histogram')+facet_wrap(~year)
+qplot(data=dat, x=DEPwestAF, geom='histogram')+facet_wrap(~year)
 
 # Do number no of or tot length of stopovers 
 # in west africa vary by year
