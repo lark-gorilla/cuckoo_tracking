@@ -428,6 +428,7 @@ m4b<-lmer(arrive_breeding~
             DEPwestAF+
             (1|year), data=dat[dat$DEPwestAF>60,])
 
+
 Anova(m4b, test.statistic = 'F')
 
 m4c<-lm(arrive_breeding~
@@ -440,17 +441,18 @@ library(MuMIn)
 r.squaredGLMM(m41)
 r.squaredGLMM(m4b)
 r.squaredGLMM(m4c)
-# Nope
+# yep I w\ant to
+# anova says we can and R2m is almost identical
 
-summary(m4b)
+summary(m4c)
 
 # plot
 
 newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
-newdat$p1<-predict(m4b, newdata=newdat, re.form=~0)
+newdat$p1<-predict(m4c, newdata=newdat, re.form=~0)
 
 predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
-vcv<-vcov(m4b)
+vcv<-vcov(m4c)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
 newdat$lc<-newdat$p1-semod*1.96
 newdat$uc<-newdat$p1+semod*1.96
@@ -461,8 +463,7 @@ qplot(data=dat[dat$DEPwestAF>60,], x=DEPwestAF, y=arrive_breeding)+
   geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')
   
 #### can we use residuals of model to test anything
-r1<-resid(lmer(arrive_breeding~DEPwestAF+
-                          (1|year), data=dat[dat$DEPwestAF>60,],
+r1<-resid(lm(arrive_breeding~DEPwestAF, data=dat[dat$DEPwestAF>60,],
                            na.action=na.exclude), type='pearson')
 
 which(dat$DEPwestAF<60)
@@ -470,38 +471,60 @@ which(dat$DEPwestAF<60)
 r2<-c(r1[1:22], NA, r1[23:length(r1)])
 
 
-dat$m4b_resid<-r2
+dat$m4c_resid<-r2
 
 
 # does amount of time or stopovers in WA affect migration speed?
 
 # shouldnt be using year as random effect as resid model already had year as a RE
-qplot(data=dat, x=noSOwestAF, y=m4b_resid, colour=year)
+qplot(data=dat, x=noSOwestAF, y=m4c_resid, colour=year)
 
-Anova(lmer(m4b_resid~noSOwestAF+
-           (1|ptt)+(1|year), data=dat), test.statistic = 'F') # mildly significant
+qplot(data=dat, x=year, y=m4c_resid, geom='boxplot')
 
-Anova(lmer(m4b_resid~sumSOwestAF+
-             (1|ptt)+(1|year), data=dat), test.statistic = 'F')
+qplot(data=dat, x=breeding_loc, y=m4c_resid, geom='boxplot')
 
-Anova(lmer(m4b_resid~breeding_loc+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+# fill gaps in autumn-mig data
+dat[4,]$autumn_mig<-'SE'
+dat[16,]$autumn_mig<-'SE'
+dat[20,]$autumn_mig<-'SW'
+dat[25,]$autumn_mig<-'SE'
+dat[26,]$autumn_mig<-'SE'
+dat[27,]$autumn_mig<-'SE'
+dat[29,]$autumn_mig<-'SE'
+dat[31,]$autumn_mig<-'SE'
+dat[33,]$autumn_mig<-'SE'
+dat[34,]$autumn_mig<-'SW'
+dat[35,]$autumn_mig<-'SW'
 
-Anova(lmer(m4b_resid~autumn_mig+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+library(gridExtra)
 
-qplot(data=dat, x=minlongwestAF, y=m4b_resid)
+grid.arrange(qplot(data=dat, x=noSOwestAF, y=m4c_resid),
+             qplot(data=dat, x=minlongwestAF, y=m4c_resid),
+          qplot(data=dat, x=year, y=m4c_resid, geom='boxplot'),
+          qplot(data=dat, x=autumn_mig, y=m4c_resid, geom='boxplot'), ncol=2)
 
-summary(lmer(m4b_resid~minlongwestAF+(1|ptt)+(1|year), data=dat), test.statistic = 'F')
+qplot(data=dat, x=breeding_loc, y=m4c_resid, geom='boxplot')
 
-Anova(lmer(m4b_resid~minlongwestAF+(1|ptt)+(1|year),
-           data=dat), test.statistic = 'F')
 
-mr1<- lm(m4b_resid~sumSOwestAF+breeding_loc+minlongwestAF, data=dat)
+mr1<- lmer(m4c_resid~year+autumn_mig+noSOwestAF+breeding_loc+
+              minlongwestAF+(1|ptt), data=dat)
+mr1a<- lm(m4c_resid~year+autumn_mig+noSOwestAF+breeding_loc+
+             minlongwestAF, data=dat)
+
+# see if we need ptt RF
+anova(mr1, mr1a)
 
 Anova(mr1, test.statistic = 'F')
 
+
+em1<-emmeans(mr1, specs='year')
+contrast(em1, 'tukey')
+
+#HSD.test(mr1a, trt='year', console=TRUE) only lm
+
 # remove the birds that last transmission is in east WA (eg Nigeria), this could be
 # overconservative
-mr2<- lm(m4b_resid~sumSOwestAF+breeding_loc+minlongwestAF,
+mr2<- lm(m4b_resid~noSOwestAF+breeding_loc+minlongwestAF,
          data=dat[dat$minlongwestAF<1,])
 
 Anova(mr2, test.statistic = 'F')# mildly significant
