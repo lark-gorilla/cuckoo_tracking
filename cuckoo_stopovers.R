@@ -141,14 +141,21 @@ for(i in birds)
     # Here we use 1 hour - we're doing this on non duty-cycle data 
     # as it gives more accurate timings 
     
-    if(unique(ptt_mgroup$LOS)<1){next}
+    if(unique(ptt_mgroup$LOS.recalc)<1){next}
     
     ###########################################################
     
+    # new stopover end datetime from LOS.recalc
+    
+    endTT<-as.double(min(ptt_mgroup$timestamp))+(unique(ptt_mgroup$LOS.recalc)*(24*60*60))
+    endtimestamp<-paste(as.Date(as.POSIXlt(endTT, origin="1970-01-01", "UTC")), 
+                        format((as.POSIXlt(endTT, origin="1970-01-01", "UTC")), "%H:%M:%S"))
+    ###########################################
+    
     ptt_mgroup_out<-data.frame(ptt=i, name=unique(ptt_mgroup$name), mgroup=j, 
                                 SO_start=min(ptt_mgroup$timestamp),
-                                SO_end=max(ptt_mgroup$timestamp),
-                                SO_days=unique(ptt_mgroup$LOS),
+                                SO_end=endtimestamp,
+                                SO_days=unique(ptt_mgroup$LOS.recalc),
                                 SO_median_long=median(ptt_mgroup$long),
                                 SO_median_lat=median(ptt_mgroup$lat),
                                 SO_month=round(median(ptt_mgroup$month)),
