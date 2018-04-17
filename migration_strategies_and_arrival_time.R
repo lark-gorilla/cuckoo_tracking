@@ -549,10 +549,14 @@ d4_naeu<-d4 %>% filter(region=='Europe' | region=='North Africa')
 
 g1<-d4_naeu %>% group_by(ptt, year)
 
-lc1<-g1 %>% summarise(fc=first(country), minlat=min(SO_median_lat))
+lc1<-g1 %>% dplyr::summarise(first_SO_afterWA=first(country), first_SO_afterWAlat=min(SO_median_lat))
 lc1$year<-as.factor(lc1$year)
 
-dat2<-left_join(dat, lc1, by=c('ptt', 'year'))
+dat2<-dplyr::left_join(dat, lc1, by=c('ptt', 'year'))
+
+# write out data
+write.csv(dat2, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv", quote=F, row.names=F)
+
 
 qplot(data=dat2, x=fc, y=m4b_resid, geom='boxplot')
 
