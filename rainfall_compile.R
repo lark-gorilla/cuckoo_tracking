@@ -45,6 +45,11 @@ map('world', add=T)
 
 dat<-read.csv('data/stopover_bestofday_1daymin_recalc_spring_mig.csv', h=T)
 
+#remove non- west african rows
+
+dat<-dat[which( ! dat$country%in% c('Algeria', 'France', 'Italy', 'Morocco' ,'Spain',
+                            'United Kingdom', 'Portugal')),]
+
 # Make are of WA extraction
 
 data("wrld_simpl", package = 'maptools')
@@ -72,6 +77,7 @@ names(ras)
 
 print(raster(ras, layer=1))
 
+
 # get annual rasters
 
 # 124 comes from 1;124 max DOY in west africa (4th May)
@@ -88,6 +94,116 @@ r2017<-subset(ras, 2040:(2040+124))
 # I THINK that it is actually pulling the rainfall DOY before the one in
 # question, so 24hr time lag.. which is kinda what we want
 
+
+# Remove - values from rasters? should do !!! 
+
+library(reshape2)
+library(dplyr)
+
+
+int_out<-NULL
+for( i in 2012:2017) # or should I do per row
+{
+ 
+  indat<-dat[dat$year==i,]
+  
+    # cool the 'get' command grabs the collect raster set from the memory
+    ras_temp<-get(paste0('r', i))
+    
+    # add 50 km buffer as per stopover definition. buffer=50000
+    ext<-extract(ras_temp, indat[,7:8], buffer=50000, fun=median)
+    
+    ext[ext<0]<-NA # remove negative values '-99'
+    
+    dimnames(ext)[[2]]<-1:(length(dimnames(ext)[[2]]))
+    
+    out<-data.frame(ptt=indat$ptt, country=indat$country, year=i, 
+                    SO_startDOY=indat$SO_startDOY, 
+                    SO_endDOY=indat$SO_endDOY, ext)
+    
+    out$ID<-with(out, paste(ptt, year, SO_startDOY, sep="_"))
+    
+    outm<-melt(out, id.vars=c('ID', 'ptt', 'country', 'year',
+                              'SO_startDOY', 'SO_endDOY'))
+    
+    outm$variable<-as.numeric(substr(outm$variable,
+                                     2,nchar(as.character(outm$variable))))
+   
+     outm<-outm[order(outm$ID),]
+     
+   
+    out2<-outm %>% group_by(ID) %>%
+      mutate(cuck_pres=ifelse(variable %in% 
+                      (SO_startDOY:SO_endDOY),"Y", "N"))
+    # warning comes from all the DOY values in the group. not an issue
+    
+    int_out<-rbind(int_out, out2)
+}
+  
+# write out
+
+write.csv(int_out, 'data/spring_rainfall_by_stopover.csv', row.names = F, quote=F)
+
+### visualisastion  
+  
+library(ggplot2)
+library(scales)
+
+
+# order country factors by longitude
+
+int_out$country<-factor(int_out$country)
+int_out$country<-factor(int_out$country, levels= c("Angola", "Democratic Republic of the Congo",
+                                                   "Congo", "Gabon", "Central African Republic", 
+                                                   "Cameroon", "Nigeria", "Togo", "Burkina Faso",
+                                                   "Ghana", "Cote d'Ivoire", "Liberia", "Guinea", 
+                                                   "Sierra Leone"))
+
+
+p<-ggplot(data=int_out[int_out$ptt=='62608' & int_out$year=='2012',], 
+          aes(x=variable, y=value))
+
+p+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=100), fill='grey')+
+  geom_bar(stat='identity', colour='black')+
+  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+  facet_wrap(~SO_startDOY+country)+theme_classic()+
+  ylab('daily rainfall (mm)')+ xlab('Day of year')
+
+
+p<-ggplot(data=int_out[int_out$year=='2013',], 
+          aes(x=variable, y=value))
+
+p+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=100, colour=factor(ptt)), fill=NA)+
+  geom_bar(stat='identity', colour='black')+
+  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+  facet_wrap(~country)+theme_classic()+
+  ylab('daily rainfall (mm)')+ xlab('Day of year')
+
+
+p<-ggplot(data=int_out, 
+          aes(x=variable, y=value))
+
+p+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=100, colour=factor(ptt)), fill=NA)+
+  geom_bar(stat = "summary", fun.y = "mean", colour='black')+
+  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+  facet_wrap(~country)+theme_classic()+
+  ylab('daily rainfall (mm)')+ xlab('Day of year')
+
+
+p<-ggplot(data=int_out[int_out$country='Ghana',], 
+          aes(x=variable, y=value))
+
+p+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=100, colour=factor(ptt)), fill=NA)+
+  geom_bar(stat = "summary", fun.y = "mean", colour='black')+
+  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+  facet_wrap(~year)+theme_classic()+
+  ylab('daily rainfall (mm)')+ xlab('Day of year')
+
+
+
+
+##### old #####
+  
 for( i in 1:124) # or should I do per row
 {
  
