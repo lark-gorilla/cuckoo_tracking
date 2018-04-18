@@ -144,6 +144,104 @@ for( i in 2012:2017) # or should I do per row
 
 write.csv(int_out, 'data/spring_rainfall_by_stopover.csv', row.names = F, quote=F)
 
+
+
+
+#### animation of rainfall #####
+
+data("wrld_simpl", package = 'maptools')
+
+library('sf')
+
+world <- st_as_sf(wrld_simpl)
+
+dat<-read.csv('data/stopover_bestofday_1daymin_recalc_spring_mig.csv', h=T)
+
+# remove negative values
+
+r2012[r2012<0]<-NA
+r2013[r2013<0]<-NA
+r2014[r2014<0]<-NA
+r2015[r2015<0]<-NA
+r2016[r2016<0]<-NA
+r2017[r2017<0]<-NA
+
+d2012<-dat[dat$year=='2012',]
+d2013<-dat[dat$year=='2013',]
+d2014<-dat[dat$year=='2014',]
+d2015<-dat[dat$year=='2015',]
+d2016<-dat[dat$year=='2016',]
+d2017<-dat[dat$year=='2017',]
+
+
+library(tmap)
+library(animation)
+
+tmaptools::palette_explorer() 
+
+
+tmap_mode('plot')
+
+saveGIF({
+for(i in 1:123)
+{
+ 
+  indat<-which(by(d2012, 1:nrow(d2012), FUN=function(x){i %in% x$SO_startDOY:x$SO_endDOY}))
+   
+  d_day<-d2012[indat,]
+  
+  d_day$name<-factor(d_day$name)
+  
+  if(nrow(d_day)==0){
+    d_day<-SpatialPointsDataFrame(SpatialPoints(cbind(8, 55), 
+            proj4string=CRS(projection(ras))), data=d_day[1,])
+            }else{
+            d_day<-SpatialPointsDataFrame(SpatialPoints(d_day[,7:8], 
+            proj4string=CRS(projection(ras))), data=d_day)
+            }
+  
+    ras1<-subset(r2012,i)
+    
+    if(i==1){cumra<-ras1}else{cumra<-cumra+ras1}
+    cumra[cumra<1]<-NA
+    
+    ras1[ras1>10]<-10
+    
+    p1<-rasterToPolygons(ras1, dissolve=T, fun=function(x){x==10})
+    if(is.null(p1)){p1<-rasterToPolygons(crop(ras1, extent(c(20,21, 55, 56))), dissolve=T)}
+    
+    
+    print(
+      tm_shape(cumra, projection=projection(ras), 
+               is.master=T, bbox=extent(-17, 33, -17, 26))+
+        tm_raster(breaks=c(100,500,1000,5000,10000,12000), palette = "Blues", n = 5,
+                  colorNA=NULL, title='rainfall (mm)')+
+        tm_shape(world)+tm_borders()+tm_shape(p1)+tm_fill(col='red', alpha=0.5)+
+        tm_layout(legend.position=c('right', 'top'), main.title=paste('Day', i))
+        )
+
+}
+}, interval=1, "N:/cuckoo_tracking/outputs/rainfall_stopovers2012.gif")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### visualisastion  
   
 library(ggplot2)

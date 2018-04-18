@@ -111,6 +111,10 @@ writeOGR(obj=stopovers_spdf, dsn="spatial",
 
 # To create master spredsheet with stopovers for Chris
 
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+
 dat<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
 
 # FORMAT!!
@@ -247,6 +251,17 @@ write.csv(dat, "data/stopover_table_bestofday_1daymin_recalc_biomes.csv", quote=
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel
 
+## Manual fill of NA countries from GIS lookup
+
+dat[which(is.na(dat$country)),]
+dat[2,]$country<-'Belgium'
+dat[c(426,442),]$country<-'United Kingdom'
+dat[c(426,442),]$country<-'United Kingdom'
+dat[193,]$country<-'Netherlands'
+dat[207,]$country<-'United Kingdom'
+dat[833,]$country<-'United Kingdom'
+dat[568,]$country<-'Spain'
+dat[570,]$country<-'United Kingdom'
 
 # Exporting as KML files 
 
