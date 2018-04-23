@@ -5,18 +5,14 @@ date: "17 April 2018"
 output: html_document
 ---
 
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
-```
-
-
-```{r pressure, echo=FALSE, message=F, warning=F}
+```{r cuckoos, echo=FALSE, message=F, warning=F, fig.height=12, fig.width=12}
 
 #### work around for different laptop/desktop directories ####
 #### !!!! RUN THIS !!!! ####
  if(Sys.info()['nodename']=="D9L5812"){
    setwd("C:/cuckoo_tracking")}else{
     setwd("N:/cuckoo_tracking")}
+
 
 int_out<-read.csv('data/spring_rainfall_by_stopover.csv', h=T)
 
@@ -34,26 +30,31 @@ int_out$country<-factor(int_out$country, levels= c("Angola", "Democratic Republi
                                                    "Cameroon", "Nigeria", "Togo", "Burkina Faso",
                                                    "Ghana", "Cote d'Ivoire", "Liberia", "Guinea", 
                                                    "Sierra Leone"))
+outlist<-list()
 for( i in 2012:2017)
   {
   int1<-int_out[int_out$year==i,]
-  
+    
   for(j in unique(int1$ptt))
       {
 dtemp<-dat[dat$year==i & dat$ptt==j,]
 
-p<-ggplot(data=int_out[int_out$ptt==j & int_out$year==i,], 
+szr<-length(unique(paste(int_out[int_out$ptt==j & int_out$year==i,]$country,int_out[int_out$ptt==j & int_out$year==i,]$SO_startDOY )))
+
+temp=ggplot(data=int_out[int_out$ptt==j & int_out$year==i,], 
           aes(x=variable, y=value))+
-geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=100), fill='grey')+
+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=50), fill='grey')+
   geom_bar(stat='identity', colour='black')+
   geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
   facet_wrap(~SO_startDOY+country)+theme_classic()+
   ylab('daily rainfall (mm)')+ xlab('Day of year')+
           ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", dtemp$arrive_breeding, "   Mig speed:", round(dtemp$m4c_resid, 2)))
 
-  print(p)
-        
+outlist[[paste(szr, i, j)]]<-temp
+print(temp)
+
   }
 }
 
 ```
+
