@@ -33,7 +33,7 @@ dat2$SO_year=as.numeric(substr(dat2$SO_start, 1,4))
 
 dat2<-rename(dat2, c("SO_year" = "year"))
 
-d2<-join_all(list(dat2, UK_travel), by=c("ptt", "year"))
+d2<-plyr::join_all(list(dat2, UK_travel), by=c("ptt", "year"))
 
 # this line subsets birds and years that I want to exclude from the 
 # the analyses i.e they do not complete a full cycle
@@ -100,9 +100,84 @@ d4$unreliable_exit<-NULL
 write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
 
 
+#### to make d2 for birds that died ####
+
+dat2<-read.csv("data/stopover_table_bestofday_1daymin_recalc_biomes.csv", h=T)
+
+dat2$SO_start <- as.POSIXct(strptime(dat2$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat2$SO_end <- as.POSIXct(strptime(dat2$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+library(plyr)
+
+#re-define year so that it is the year that the stopover starts in
+dat2$SO_year=as.numeric(substr(dat2$SO_start, 1,4))
+
+dat2<-rename(dat2, c("SO_year" = "year"))
+
+dat2$UK_entry<-NA
+dat2$UK_exit<-NA
+dat2$breeding_entry<-NA
+dat2$breeding_exit<-NA
+dat2$UK_br_diff_days<-NA
+
+library(lubridate)
+
+dat2$SO_startDOY<-yday(
+  dat2$SO_start) 
+
+dat2$SO_endDOY<-yday(
+  dat2$SO_end) 
+
+
+
+dead_cucks=data.frame(ptt=c(62518,62520,62602,11597,11599,128296,128303,161323,134958,128300),
+                      year_died=c(2012,2012,2012,2013,2014,2014,2014,2017,2015,2015), 
+                      done_dead='yarp')
+
+d2<-plyr::join_all(list(dat2, dead_cucks), by=c("ptt"))
+
+d2<-d2[-which(is.na(d2$done_dead)),]
+
+# all birds except livingstone were tagged the summer before they died
+d2<-d2[-which(d2$ptt==128300 & d2$year==2013),]
+
+d2<-rename(d2, c("year_died" = "mig_cohort"))
+
+d2$SO_month<-NULL
+
+
+dt_of_min_lat<-ddply(d2, .(ptt, mig_cohort), .fun =
+                       function(x){c(x[x$SO_median_lat==min(x$SO_median_lat),]$SO_start,
+                                     x[x$SO_median_lat==min(x$SO_median_lat),]$SO_end)})
+
+d2.5<-join_all(list(d2, dt_of_min_lat), by=c("ptt", "mig_cohort"))
+
+d2.5<-rename(d2.5, c("V1"="winterSO_start",
+                     "V2"="winterSO_end"))
+
+d2.5$is_spring_mig<-d2.5$year==d2.5$mig_cohort
+
+d4<-d2.5[d2.5$is_spring_mig==TRUE,]
+
+d4$is_spring_mig<-NULL
+d4$done_dead<-NULL
+
+write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", quote=F, row.names=F)
+
+
+########################################
+
+
 # NOW create master file, 1 row per bird and migration 
 
 d4<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig.csv", h=T)
+d4$dead=0
+
+d4_dead<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", h=T)
+d4_dead$dead=1
+
+
+d4<-rbind(d4, d4_dead)
 
 d4$SO_start <- as.POSIXct(strptime(d4$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 d4$SO_end <- as.POSIXct(strptime(d4$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
