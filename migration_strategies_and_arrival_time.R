@@ -300,7 +300,7 @@ summarise(years, mean(depart_winterSO, na.rm=T), sd(depart_winterSO, na.rm=T),
   
 library(reshape2)      
 
-d1<-melt(dat)
+d1<-melt(dat, id.vars=c("ptt", "year"))
 
 d2<-filter(d1, variable=='depart_winterSO'|variable=='DEPcentralAF'|
              variable=='DEPwestAF'|variable=='DEPnorthAF'|
@@ -309,7 +309,7 @@ d2<-filter(d1, variable=='depart_winterSO'|variable=='DEPcentralAF'|
 #jpeg("outputs/spring_mig_timing_year.jpg",
     width = 12, height =9 , units ="in", res =300)
 
-qplot(data=d2, x=variable, y=value, colour=year, geom='boxplot' )
+qplot(data=d2, x=variable, y=as.numeric(value), colour=factor(year), geom='boxplot' )
 
 dev.off()
 
@@ -330,7 +330,7 @@ d3<-filter(d1, variable=='sumSOcentralAF'|variable=='sumSOwestAF'|
 #jpeg("outputs/spring_mig_SOdur_year.jpg",
 width = 12, height =9 , units ="in", res =300)
 
-qplot(data=d3, x=variable, y=value, colour=year, geom='boxplot' )
+qplot(data=d3, x=variable, y=as.numeric(value), colour=factor(year), geom='boxplot' )
 
 dev.off()
 
@@ -340,8 +340,8 @@ library(GGally)
 
 #jpeg("~/BTO/cuckoo_tracking/outputs/spring_mig_corr.jpg",
 #     width = 24, height =12 , units ="in", res =600)
-ggpairs(dat)
-dev.off()
+#ggpairs(dat)
+#dev.off()
 
 # ok nice, but too big to visualise in R
 
@@ -351,12 +351,12 @@ dev.off()
  dev.off()
                  
  
- #jpeg("outputs/spring_mig_departures.jpg",
+# jpeg("outputs/spring_mig_departures.jpg",
       width = 12, height =9 , units ="in", res =300)
  ggpairs(dat[,3:9])
  dev.off()
  
- #jpeg("outputs/spring_mig_stopover_dur.jpg",
+# jpeg("outputs/spring_mig_stopover_dur.jpg",
  width = 12, height =9 , units ="in", res =300)
 ggpairs(dat[,10:17])
 dev.off()
@@ -395,7 +395,7 @@ library(ggplot2)
 qplot(data=dat, x=DEPwestAF, y=arrive_breeding, col=factor(ptt))
 
 
-qplot(data=dat[dat$DEPwestAF>60,], x=DEPwestAF, y=arrive_breeding)+
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
   geom_smooth(method='lm')+facet_wrap(~year)
 
 # check multiple year birds
@@ -407,11 +407,11 @@ summary(lmer(arrive_breeding~factor(ptt)+
 
 m4<-lmer(arrive_breeding~depart_winterSO+
            DEPcentralAF+DEPwestAF+
-           (1|ptt)+(1|year), data=dat[dat$DEPwestAF>60,])
+           (1|ptt)+(1|year), data=dat)
 
 m41<-lmer(arrive_breeding~depart_winterSO+
            DEPcentralAF+DEPwestAF+
-           (1|year), data=dat[dat$DEPwestAF>60,])
+           (1|year), data=dat)
 
 anova(m4, m41) # ptt RF doesnt add anything
 
@@ -420,19 +420,19 @@ Anova(m41, test.statistic = 'F')
 
 m4a<-lmer(arrive_breeding~depart_winterSO+
            DEPwestAF+
-           (1|year), data=dat[dat$DEPwestAF>60,])
+           (1|year), data=dat)
 
 Anova(m4a, test.statistic = 'F')
 
 m4b<-lmer(arrive_breeding~
             DEPwestAF+
-            (1|year), data=dat[dat$DEPwestAF>60,])
+            (1|year), data=dat)
 
 
 Anova(m4b, test.statistic = 'F')
 
 m4c<-lm(arrive_breeding~
-            DEPwestAF, data=dat[dat$DEPwestAF>60,])
+            DEPwestAF, data=dat)
 
 # check if we can drop year randome effect
 anova(m4b, m4c)
@@ -457,26 +457,21 @@ semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
 newdat$lc<-newdat$p1-semod*1.96
 newdat$uc<-newdat$p1+semod*1.96
 
-qplot(data=dat[dat$DEPwestAF>60,], x=DEPwestAF, y=arrive_breeding)+
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
   geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
   geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
-  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')+
+  xlab("Departure date West Africa (DOY)")+
+  xlab("Arrival at breeding grounds (DOY)")+
+  theme_classic()
   
 #### can we use residuals of model to test anything
-r1<-resid(lm(arrive_breeding~DEPwestAF, data=dat[dat$DEPwestAF>60,],
+dat$m4c_resid<-resid(lm(arrive_breeding~DEPwestAF, data=dat,
                            na.action=na.exclude), type='pearson')
-
-which(dat$DEPwestAF<60)
-
-r2<-c(r1[1:22], NA, r1[23:length(r1)])
-
-
-dat$m4c_resid<-r2
 
 
 # does amount of time or stopovers in WA affect migration speed?
 
-# shouldnt be using year as random effect as resid model already had year as a RE
 qplot(data=dat, x=noSOwestAF, y=m4c_resid, colour=year)
 
 qplot(data=dat, x=year, y=m4c_resid, geom='boxplot')
@@ -503,7 +498,7 @@ grid.arrange(qplot(data=dat, x=noSOwestAF, y=m4c_resid),
           qplot(data=dat, x=year, y=m4c_resid, geom='boxplot'),
           qplot(data=dat, x=autumn_mig, y=m4c_resid, geom='boxplot'), ncol=2)
 
-qplot(data=dat, x=breeding_loc, y=m4c_resid, geom='boxplot')
+qplot(data=dat, x=breeding_loc, y=m4c_resid, geom='boxplot')+geom_point
 
 
 mr1<- lmer(m4c_resid~year+autumn_mig+noSOwestAF+breeding_loc+
@@ -516,7 +511,7 @@ anova(mr1, mr1a)
 
 Anova(mr1, test.statistic = 'F')
 
-
+library(emmeans)
 em1<-emmeans(mr1, specs='year')
 contrast(em1, 'tukey')
 
@@ -524,7 +519,7 @@ contrast(em1, 'tukey')
 
 # remove the birds that last transmission is in east WA (eg Nigeria), this could be
 # overconservative
-mr2<- lm(m4b_resid~noSOwestAF+breeding_loc+minlongwestAF,
+mr2<- lm(m4c_resid~year+noSOwestAF+breeding_loc+minlongwestAF,
          data=dat[dat$minlongwestAF<1,])
 
 Anova(mr2, test.statistic = 'F')# mildly significant
@@ -545,28 +540,27 @@ summary(lm(m4b_resid~minlongwestAF,
 
 library(dplyr)
 
-d4_naeu<-d4 %>% filter(region=='Europe' | region=='North Africa')
+lc1<-d4 %>% filter(region=='Europe' | region=='North Africa')%>%
+  group_by(ptt, year)%>%
+  summarise(firstSO_afterWA=first(country), firstSO_afterWAlat=min(SO_median_lat))
 
-g1<-d4_naeu %>% group_by(ptt, year)
-
-lc1<-g1 %>% dplyr::summarise(first_SO_afterWA=first(country), first_SO_afterWAlat=min(SO_median_lat))
 lc1$year<-as.factor(lc1$year)
 
-dat2<-dplyr::left_join(dat, lc1, by=c('ptt', 'year'))
+dat2<-left_join(dat, lc1, by=c('ptt', 'year'))
 
-# write out data
-write.csv(dat2, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv", quote=F, row.names=F)
+qplot(data=dat2, x=fc, y=m4c_resid, geom='boxplot')
 
-
-qplot(data=dat2, x=fc, y=m4b_resid, geom='boxplot')
-
-fcm<- lm(m4b_resid~fc,data=dat2)
+fcm<- lm(m4c_resid~fc,data=dat2)
 
 Anova(fcm, test.statistic = 'F')# mildly significant
 
 summary(fcm)
 
 emmeans(fcm, specs='fc')
+
+dat2<-dplyr::rename(dat2,firstSO_afterWA=fc, firstSO_afterWAlat=minlat)
+
+write.csv(dat2, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv", quote=F, row.names=F)
 
 
 # is arrival determined by population
