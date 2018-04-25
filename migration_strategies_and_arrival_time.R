@@ -620,3 +620,19 @@ Anova(SOc, test.statistic = 'F')
 SOne<-lmer(sumSOeurope~sumSOnorthAF+factor(year)+
             (1|ptt), data=dat)
 Anova(SOne, test.statistic = 'F')
+
+
+
+# extra analyses  25/04
+
+qplot(data=dat, y=arrive_breeding, x=breeding_loc)+geom_point(data=dat, aes(y=arrive_uk, x=breeding_loc), shape=2)+geom_point(data=dat, aes(y=DEPwestAF,x=breeding_loc), shape=3)+facet_wrap(~year)+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+geom_text(data=dat, aes(y=DEPwestAF+2,x=breeding_loc, label=arrive_breeding-DEPwestAF), nudge_x=0.5)+geom_text(data=dat, aes(y=arrive_breeding+2,x=breeding_loc, label=ptt), size=3)
+
+library(dplyr)
+
+
+d5<-d4 %>% group_by(ptt, year, region) %>% summarise(last_c=last(country))
+
+qplot(data=dat2, y=DEPwestAF, x=last_c, col=factor(year))
+
+
+
