@@ -22,6 +22,7 @@ dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.
 ### visualisastion  
   
 library(ggplot2)
+library(dplyr)
 
 # order country factors by longitude
 
@@ -30,7 +31,9 @@ int_out$country<-factor(int_out$country, levels= c("Angola", "Democratic Republi
                                                    "Cameroon", "Nigeria", "Togo", "Burkina Faso",
                                                    "Ghana", "Cote d'Ivoire", "Liberia", "Guinea", 
                                                    "Sierra Leone"))
-outlist<-list()
+int_out[is.na(int_out$value),]$value<-0
+int_out$ID2<-paste(int_out$SO_startDOY, int_out$country)
+
 for( i in 2012:2017)
   {
   int1<-int_out[int_out$year==i,]
@@ -39,19 +42,27 @@ for( i in 2012:2017)
       {
 dtemp<-dat[dat$year==i & dat$ptt==j,]
 
-szr<-length(unique(paste(int_out[int_out$ptt==j & int_out$year==i,]$country,int_out[int_out$ptt==j & int_out$year==i,]$SO_startDOY )))
+t1<-int_out[int_out$ptt==j & int_out$year==i,]
 
-temp=ggplot(data=int_out[int_out$ptt==j & int_out$year==i,], 
-          aes(x=variable, y=value))+
-geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=50), fill='grey')+
+t2<-t1 %>% group_by(ID2) %>% dplyr::mutate(cumrf=cumsum(value))
+
+temp=ggplot(data=t2,aes(x=variable, y=value))+
+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
   geom_bar(stat='identity', colour='black')+
-  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
-  facet_wrap(~SO_startDOY+country)+theme_classic()+
-  ylab('daily rainfall (mm)')+ xlab('Day of year')+
+    geom_line(aes(y=cumrf), col='green', size=1)+
+  facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
+  ylab('cumulative rainfall since 01 Jan (mm)')+ xlab('Day of year')+
           ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", dtemp$arrive_breeding, "   Mig speed:", round(dtemp$m4c_resid, 2)))
 
-outlist[[paste(szr, i, j)]]<-temp
 print(temp)
+
+#temp=ggplot(data=t2,aes(x=variable, y=value))+
+#geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=50), #fill='grey')+
+#  geom_bar(stat='identity', colour='black')+
+#  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+#  facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
+#  ylab('daily rainfall (mm)')+ xlab('Day of year')+
+#          ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", #dtemp$arrive_breeding, "   Mig speed:", round(dtemp$m4c_resid, 2)))
 
   }
 }

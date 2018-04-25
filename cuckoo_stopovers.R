@@ -185,7 +185,7 @@ library(ggplot2)
 library(ggmap)
 
 # using best of day data
-dat<-read.csv("data/stopover_table_biomes_1daymin_recalc.csv", h=T)
+dat<-read.csv("data/stopover_table_bestofday_1daymin_recalc.csv", h=T)
 
 setwd("sourced_data/")
 countries<-readOGR(layer="TM_WORLD_BORDERS-0.3",
