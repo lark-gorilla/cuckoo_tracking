@@ -226,16 +226,16 @@ nrow(d4[d4$SO_days<3,]) # old appraoch lost ~ 25% of stopovers
 
 # OK now just want last stopover in west africa before bird flew
 
-out_tab<-ddply(d4, .(ptt, year, region), summarize,
+out_tab<-ddply(d4, .(ptt, year, dead, region), summarize,
                depart=max(SO_end), no_SO=length(SO_end),
                sum_SO=sum(SO_days), minlongWA=min(SO_median_long))
 
-out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
+out2<-ddply(d4, .(ptt, year, dead), summarize, depart_winterSO=unique(winterSO_end),
             arrive_uk=unique(UK_entry), arrive_breeding=unique(breeding_entry))
             
 
 out2.5<-join_all(list(out2, out_tab[out_tab$region=="Central Africa",]),
-               by=c("ptt", "year"))
+               by=c("ptt", "year", 'dead'))
 out2.5$region<-NULL
 out2.5$minlongWA<-NULL
 out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
@@ -243,7 +243,7 @@ out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
                      "sum_SO"="sumSOcentralAF"))
 
 out3<-join_all(list(out2.5, out_tab[out_tab$region=="West Africa",]),
-                 by=c("ptt", "year"))
+                 by=c("ptt", "year", 'dead'))
 
 out3$region<-NULL
 out3<-rename(out3, c("depart"="DEPwestAF",
@@ -252,7 +252,7 @@ out3<-rename(out3, c("depart"="DEPwestAF",
                      'minlongWA'='minlongwestAF'))
 
 out3.5<-join_all(list(out3, out_tab[out_tab$region=="North Africa",]),
-               by=c("ptt", "year"))
+               by=c("ptt", "year", 'dead'))
 
 out3.5$region<-NULL
 out3.5$minlongWA<-NULL
@@ -261,7 +261,7 @@ out3.5<-rename(out3.5, c("depart"="DEPnorthAF",
                      "sum_SO"="sumSOnorthAF"))
 
 out4<-join_all(list(out3.5, out_tab[out_tab$region=="Europe",]),
-                 by=c("ptt", "year"))
+                 by=c("ptt", "year", 'dead'))
 
 out4$region<-NULL
 out4$minlongWA<-NULL
@@ -276,7 +276,7 @@ strategy.dat <- read.csv("t_drive/scripts/cuckoo migratory strategy and Sahara c
 
 
 out5<-join(x=out4, y=data.frame(ptt=strategy.dat$tag, 
-                                breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
+                      breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
 
 out6<-join_all(list(out5, data.frame(ptt=strategy.dat$tag, year=strategy.dat$year, 
                                     autumn_mig=strategy.dat$migratory.strategy)),
@@ -341,16 +341,16 @@ out6$arrive_breeding <- yday(out6$arrive_breeding)
 
 library(dplyr)
 
-out6<-out6 %>% select(ptt, year, depart_winterSO, DEPcentralAF,
+out6<-out6 %>% select(ptt, year,dead, depart_winterSO, DEPcentralAF,
                 DEPwestAF, DEPnorthAF, DEPeurope, arrive_uk, arrive_breeding,
                 noSOcentralAF, sumSOcentralAF, noSOwestAF, sumSOwestAF, 
                 noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope,minlongwestAF, breeding_loc,
                 autumn_mig)
 
 # make stopovers duration and numer a zero when they don't occur
-out6[,10:17][is.na(out6[,10:17])]<-"0"
+out6[,11:18][is.na(out6[,11:18])]<-"0"
 
-write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", quote=F, row.names=F)
+write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_dead.csv", quote=F, row.names=F)
 
 
 ##################################################
@@ -358,7 +358,7 @@ write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv",
 ##################################################
 
 
-dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", h=T)
+dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
 ### summarise the data
 
