@@ -145,6 +145,39 @@ for( i in 2012:2017) # or should I do per row
 write.csv(int_out, 'data/spring_rainfall_by_stopover.csv', row.names = F, quote=F)
 
 
+### Spatial extraction and analyses.
+### comparison between rainfall at start of stopover n
+### against rainfall of all other stopovers extract for n's date
+
+int_out2<-NULL
+for( i in 1:nrow(dat)) # or should I do per row
+{
+  
+  indat<-dat[i,]
+  
+  # cool the 'get' command grabs the collect raster set from the memory
+  ras_temp<-get(paste0('r', indat$year))
+  
+  ras_temp<-subset(ras_temp, indat$SO_startDOY)
+  
+  # add 50 km buffer as per stopover definition. buffer=50000
+  ext<-extract(ras_temp, dat[,7:8], buffer=50000, fun=median)
+  
+  ext[ext<0]<-NA # remove negative values '-99'
+  
+  out<-data.frame(pa=0,ptt=dat$ptt, year=dat$year, 
+                  SO_startDOY=indat$SO_startDOY, ext)
+  out[i,]$pa<-1
+  
+  int_out2<-rbind(int_out2, out)
+}
+
+# write out
+
+write.csv(int_out2, 'data/spring_rainfall_stopover_comparison.csv', row.names = F, quote=F)
+
+
+
 
 
 #### animation of rainfall #####

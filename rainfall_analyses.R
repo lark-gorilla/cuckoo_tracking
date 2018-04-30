@@ -31,7 +31,7 @@ library(lme4)
 m1<-glmer(cuckbin~poly(cumrf, 2)+country+(1|ID), family=binomial, data=t2)
 
 pred.df=expand.grid(country=unique(t2$country), 
-                    cumrf=0:1000)
+                    cumrf=0:1000, ptt=unique(t2$ptt))
 
 pred.df$p1<-predict(m1, newdata=pred.df, re.form=~0)
 
@@ -47,7 +47,17 @@ pred.df$p2<-predict(m2, newdata=pred.df, re.form=~0)
 qplot(data=t2, x=cumrf, y=cuckbin)+
   geom_line(data=pred.df, (aes(x=cumrf, y=plogis(p2), colour=country)))
 
-anova(m1, m2)
+m3<-glmer(cuckbin~poly(cumrf, 2):factor(ptt)+(1|year), family=binomial, data=t2)
+
+pred.df$p3<-predict(m3, newdata=pred.df, re.form=~0)
+
+qplot(data=t2, x=cumrf, y=cuckbin)+
+  geom_line(data=pred.df, (aes(x=cumrf, y=plogis(p3), colour=ptt)))
+
+
+anova(m1, m2, m3)
+
+library(mgcv)
 
 out=NULL
 for( i in unique(t2$country))
@@ -56,16 +66,19 @@ for( i in unique(t2$country))
   if(length(unique(tempdat$year))>1){
   
   minc<-glmer(cuckbin~poly(cumrf, 2):factor(year)+(1|ID), family=binomial, data=tempdat)
+  gminc<-gam(cuckbin~s(cumrf, k=5, by=year), family=binomial, data=tempdat)
   
   }else{
   
   minc<-glm(cuckbin~poly(cumrf, 2), family=binomial, data=tempdat) 
+  gminc<-gam(cuckbin~s(cumrf, k=5), family=binomial, data=tempdat)
      
   }
 
   pred.df=expand.grid(cumrf=0:1500, country=i, year=unique(tempdat$year))
   
   pred.df$p1<-predict(minc, newdata=pred.df, re.form=~0)
+  pred.df$p2<-predict(gminc, newdata=pred.df)
   
   out<-rbind(out, pred.df)
 }
