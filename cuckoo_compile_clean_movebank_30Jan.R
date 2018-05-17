@@ -12,6 +12,11 @@
 
 # Jan 2018 - script lifted by MM from above paper trail
 
+#### REMEMBER WHEN DOWNLOADING FROM MOVEBANK TICK:
+#'INCLUDE UNDEPLOYED LOCATIONS'
+#'INCLUDE POINTS MARKED AS OUTLIERS'
+# otherwise some datat/birds are not dowloaded
+
 ##########################################################
 
 rm(list=ls())
@@ -44,9 +49,10 @@ library(plyr)
 # cuckoo coordinate locations are in Lat-Long and UTM coordinates and WGS84 datum
 
 #dat<-read.csv("N:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter.csv", h=T)
-dat<-read.csv("~/BTO/cuckoo_tracking/data/movebank_cuckoos_hybridfilter.csv", h=T)
+#dat<-read.csv("~/BTO/cuckoo_tracking/data/movebank_cuckoos_hybridfilter.csv", h=T)
+# now running will full dataset including 2018 spring migration
 
-#dat<-read.csv("N:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday.csv", h=T)
+dat<-read.csv("C:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday_2018.csv", h=T)
 
 head(dat)
 
@@ -84,7 +90,7 @@ g
 # merge with raw dataset
 
 #strategy.dat <- read.csv("N:/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
-strategy.dat <- read.csv("~/BTO/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
+strategy.dat <- read.csv("C:/cuckoo_tracking/t_drive/scripts/cuckoo migratory strategy and Sahara crossing success 2014_bird year multiples_NEW1.csv", header=T)
 
 strategy.dat <- rename(strategy.dat, c("tag"="ptt"))
 
@@ -262,7 +268,7 @@ plot(location.lat~location.long, d6, col=2)
 
  # ok cool!
  
- write.csv(out, "~/BTO/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_clean_RAW.csv", quote=F, row.names=F)
+ write.csv(out, "C:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday_2018_clean_RAW.csv", quote=F, row.names=F)
 
  out[out$outlier_flagged=="Y",]
  
@@ -301,14 +307,14 @@ plot(location.lat~location.long, d6, col=2)
 # remove the outliers 
  clean<-out[out$outlier_flagged!="Y",]
  
- write.csv(clean, "~/BTO/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_clean.csv", quote=F, row.names=F)
+ write.csv(clean, "C:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday_2018_clean.csv", quote=F, row.names=F)
  
  
 ####======================== ADD TRANSMISSION CYCLE VARIABLE ======================================
 
  #read back in
  
- clean<-read.csv( "N:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday_clean.csv", h=T)
+ clean<-read.csv( "C:/cuckoo_tracking/data/movebank_cuckoos_hybridfilter_bestofday_2018_clean.csv", h=T)
  
  # remember to change timestamp to POSIX format!!
  
@@ -435,7 +441,7 @@ withmovedata.all <- do.call(rbind, withmovedata)
 ####======================== ADD STOPOVER DURATION DATA ======================================
 
 # load functions for calculating LOS; calculate.LOS() and makeLOStable()
-source("N:/cuckoo_tracking/t_drive/scripts/source_scripts/function to add stopover duration data for analysis.R")
+source("C:/cuckoo_tracking/t_drive/scripts/source_scripts/function to add stopover duration data for analysis.R")
 
 withLOSdata <- lapply(withmovedata, calculate.LOS)
 withLOSdata.all <- do.call(rbind, withLOSdata)
@@ -483,9 +489,11 @@ rownames(fulloriginal) <- c(1:nrow(fulloriginal))
 
 fulloriginal$mgroup_replicate<-fulloriginal$mgroup
 
-write.csv(fulloriginal, "N:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", row.names=F, quote=F)
+write.csv(fulloriginal, "C:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_bestofday_2018_clean_stopovers_recalc.csv", row.names=F, quote=F)
 
-### Make summary table of stopovers
+### END of main code
+
+### Make summary table of stopovers - not really used
 
 withLOStable <- lapply(withmovedata, makeLOStable)
 withLOStable.all <- do.call(rbind, withLOStable)
