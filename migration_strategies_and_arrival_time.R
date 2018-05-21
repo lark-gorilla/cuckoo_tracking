@@ -18,9 +18,44 @@ if(Sys.info()['nodename']=="D9L5812"){
 # Load non best-of-day data which has stopover defined as >= 1 day
 
 
-dat2<-read.csv("data/stopover_table_bestofday_1daymin_recalc_biomes.csv", h=T)
+dat2<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
 
 UK_travel<-read.csv("data/complete_cycles_UK_all_timing.csv", h=T)
+
+# manually add 4 columns for 2018 spring migration birds. As only best of day 
+# data downloaded for 2018 entry datestime is estimated from movebank
+# We drop Peckham as he hasnt turned up in 2018
+# rows 1-4 are: PJ, Selborne, Victor, Larry
+
+arr_2018<-data.frame(ptt=c(161318, 161321, 161324, 146759), 
+                     year=2018, 
+                     UK_entry=c('2018-04-17 08:19:09',
+                                '2018-04-14 06:15:32',
+                                '2018-04-20 11:06:42',
+                                '2018-05-08 05:25:51'),
+                     UK_exit= NA,
+                     deployment_entry=FALSE,
+                     unreliable_exit=TRUE,
+                     breeding_entry=c('2018-04-17 08:19:09',
+                                      '2018-04-14 06:15:32',
+                                      '2018-04-20 11:06:42',
+                                      '2018-05-08 05:25:51'),
+                     breeding_exit= NA, 
+                     UK_entryHACK=c('2000-04-17',
+                                    '2000-04-14',
+                                    '2000-04-20',
+                                    '2000-05-08'),
+                     breeding_entryHACK=c('2000-04-17',
+                                          '2000-04-14',
+                                          '2000-04-20',
+                                          '2000-05-08'),
+                     UK_br_diff_days=0)
+
+
+# add in the 2018 data
+
+UK_travel<-rbind(UK_travel, arr_2018)
+
 
 #UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
@@ -97,12 +132,12 @@ d4$is_spring_mig<-NULL
 d4$deployment_entry<-NULL
 d4$unreliable_exit<-NULL
 # write out data
-write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
+write.csv(d4, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
 
 
 #### to make d2 for birds that died ####
 
-dat2<-read.csv("data/stopover_table_bestofday_1daymin_recalc_biomes.csv", h=T)
+dat2<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
 
 dat2$SO_start <- as.POSIXct(strptime(dat2$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 dat2$SO_end <- as.POSIXct(strptime(dat2$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -162,7 +197,7 @@ d4<-d2.5[d2.5$is_spring_mig==TRUE,]
 d4$is_spring_mig<-NULL
 d4$done_dead<-NULL
 
-write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", quote=F, row.names=F)
+write.csv(d4, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv", quote=F, row.names=F)
 
 
 ########################################
@@ -170,7 +205,7 @@ write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", quot
 
 # NOW create master file, 1 row per bird and migration 
 
-d4<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig.csv", h=T)
+d4<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", h=T)
 d4$dead=0
 
 d4_dead<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", h=T)
@@ -350,7 +385,7 @@ out6<-out6 %>% select(ptt, year,dead, depart_winterSO, DEPcentralAF,
 # make stopovers duration and numer a zero when they don't occur
 out6[,11:18][is.na(out6[,11:18])]<-"0"
 
-write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_dead.csv", quote=F, row.names=F)
+write.csv(out6, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", quote=F, row.names=F)
 
 
 ##################################################
@@ -358,7 +393,7 @@ write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary_dead.
 ##################################################
 
 
-dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
+dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
 ### summarise the data
 
@@ -479,6 +514,19 @@ summary(lmer(arrive_breeding~factor(ptt)+
         (1|year), data=dat[dat$ptt %in% names(which(table(dat$ptt)>1)),]))
 
 # Does arrival at breeding location depend on african departures
+
+# describe first
+
+dat$WA_mig_len<-dat$arrive_breeding-dat$DEPwestAF
+
+qplot(data=dat, x=year, y=WA_mig_len)
+
+qplot(data=dat, x=year, y=WA_mig_len, colour=breeding_loc)+facet_wrap(~year)
+
+# faster migration in 2015 for all birds
+
+qplot(data=dat, x=DEPwestAF, y=WA_mig_len, colour=breeding_loc)+facet_wrap(~year)
+
 
 m4<-lmer(arrive_breeding~depart_winterSO+
            DEPcentralAF+DEPwestAF+
