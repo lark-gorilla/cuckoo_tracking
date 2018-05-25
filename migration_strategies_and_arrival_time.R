@@ -211,6 +211,9 @@ d4$dead=0
 d4_dead<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", h=T)
 d4_dead$dead=1
 
+d4_dead$biome1<-NULL
+d4_dead$biome2<-NULL
+
 
 d4<-rbind(d4, d4_dead)
 
