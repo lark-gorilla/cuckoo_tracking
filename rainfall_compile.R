@@ -22,7 +22,7 @@ library(raster) # needs ncdf4 installed
 
 # stacks up all the layers
 #ras<-stack("sourced_data/PERSIANN_rainfall/monthly/PERSIANN_2018-03-26035525am.nc")
-ras<-stack("sourced_data/PERSIANN_rainfall/daily/PERSIANN_2018-03-26040045am.nc")
+ras<-stack("sourced_data/PERSIANN_rainfall/daily_inc2018/PERSIANN_2018-05-25054150am.nc")
 
 
 # warning in projection 
@@ -43,8 +43,14 @@ map('world', add=T)
 
 # Get cuckoo data
 
-dat<-read.csv('data/stopover_bestofday_1daymin_recalc_spring_mig.csv', h=T)
+dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv', h=T)
+dat$dead<-0
+dat1<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv', h=T)
+dat1$dead<-1
+dat1$biome1<-NULL
+dat1$biome2<-NULL
 
+dat<-rbind(dat,dat1)
 #remove non- west african rows
 
 dat<-dat[which( ! dat$country%in% c('Algeria', 'France', 'Italy', 'Morocco' ,'Spain',
@@ -88,6 +94,7 @@ r2014<-subset(ras, 944:(944+123))
 r2015<-subset(ras, 1309:(1309+124))
 r2016<-subset(ras, 1674:(1674+124))
 r2017<-subset(ras, 2040:(2040+124))
+r2018<-subset(ras, 2405:(2405+124))
 
 # With each annual raster, the position [x] of the layer is the DOY
 
@@ -142,7 +149,7 @@ for( i in 2012:2017) # or should I do per row
   
 # write out
 
-write.csv(int_out, 'data/spring_rainfall_by_stopover.csv', row.names = F, quote=F)
+write.csv(int_out, 'data/spring_rainfall_by_stopover_2018.csv', row.names = F, quote=F)
 
 
 ### Spatial extraction and analyses.
