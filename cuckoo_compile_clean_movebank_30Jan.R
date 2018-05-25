@@ -531,9 +531,9 @@ for(i in pttz)
 }
 
 
-setwd("~/BTO/cuckoo_tracking/data")
+setwd("C:/cuckoo_tracking/data")
 writeOGR(obj=out_line, dsn="spatial",
-         layer="movebank_cuckoos_bestofday_lines", driver="ESRI Shapefile",
+         layer="movebank_cuckoos_2018_lines", driver="ESRI Shapefile",
          overwrite_layer = T)
 
 
