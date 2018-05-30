@@ -1,6 +1,13 @@
 ## remote sensing data Rainfall and NDVI extract
 ## 30/05/2018
 
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+#### !!!!!!!!!!!!!!!!!! ####
+
 # Get cuckoo data
 
 dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv', h=T)
@@ -17,6 +24,8 @@ dat<-dat[which( ! dat$country%in% c('Algeria', 'France', 'Italy', 'Morocco' ,'Sp
                                     'United Kingdom', 'Portugal')),]
 
 
+##### %%%%%%%%% RAINFALL DATA %%%%%%%%%%%%###
+
 # read in monthly data in netcdf format ok
 
 library(raster) # needs ncdf4 installed
@@ -24,8 +33,6 @@ library(raster) # needs ncdf4 installed
 # stacks up all the layers
 #ras<-stack("sourced_data/PERSIANN_rainfall/monthly/PERSIANN_2018-03-26035525am.nc")
 ras<-stack("sourced_data/PERSIANN_rainfall/daily_inc2018/PERSIANN_2018-05-25054150am.nc")
-
-
 # warning in projection 
 
 print(raster(ras, layer=1))
@@ -42,18 +49,14 @@ plot(raster(ras, layer=5))
 library(maps)
 map('world', add=T)
 
-
 ##### check data
 
 names(ras)
-
 # name is 'units: days since 2011-06-01'
 
 print(raster(ras, layer=1))
 
-
 # get annual rasters
-
 # 124 comes from 1;124 max DOY in west africa (4th May)
 
 r2012<-subset(ras, 213:(213+124))
@@ -69,18 +72,37 @@ r2018<-subset(ras, 2405:(2405+124))
 # I THINK that it is actually pulling the rainfall DOY before the one in
 # question, so 24hr time lag.. which is kinda what we want
 
+##### %%%%%%%%% NDVI DATA %%%%%%%%%%%%###
 
-# Remove - values from rasters? should do !!! 
+tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS")
+
+#order them by date rather than satellite (Terra and Aqua)
+tifz<-tifz[order(substr(tifz, 14,21))]
+
+for(i in tifz)
+{
+  if(which(i==tifz)==1){
+    rastack<-raster(paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS/",i))
+  }else{
+    rastack<-stack(rastack, paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS/",i))  
+  }
+  print(i)  
+}
+
+projection(rastack)
+
 
 library(reshape2)
 library(dplyr)
 
 
 int_out<-NULL
-for( i in 2012:2017)
+for( i in 2012:2018)
 {
   
   indat<-dat[dat$year==i,]
+  
+  ## Rainfall extract
   
   # cool the 'get' command grabs the collect raster set from the memory
   ras_temp<-get(paste0('r', i))
@@ -96,10 +118,35 @@ for( i in 2012:2017)
                   SO_startDOY=indat$SO_startDOY, 
                   SO_endDOY=indat$SO_endDOY, ext)
   
+  ## NDVI  extract
+  
+  ndvi_temp<-subset(rastack, which(substr(tifz, 14,17)==i))
+  
+  ext2<-extract(ndvi_temp, indat[,7:8], buffer=50000, fun=median, na.rm=T)
+  
+  ext2<-ext2*0.0001 # apply scaling to get NDVI from -1 to 1
+  
+  # loop to rep ndvi values over each of the 8 days they represent
+  extrep<-NULL
+  for(i in 1:(ncol(ext2)-1))
+  {
+   extrep<-cbind(extrep, matrix(rep(ext2[,i], 8), ncol=8)) 
+  }
+  extrep<-cbind(extrep, matrix(rep(ext2[,16], 5), ncol=5))
+  
+
+  
+  
+  
   out$ID<-with(out, paste(ptt, year, SO_startDOY, sep="_"))
   
   outm<-melt(out, id.vars=c('ID', 'ptt', 'country', 'year',
                             'SO_startDOY', 'SO_endDOY'))
+  
+  # reconstruct data.frame to have rainfall and ndvi
+  outndvi<-outm[((nrow(out)*125)+1):((nrow(out)*125)*2),]$value
+  outm<-outm[1:(nrow(out)*125),]
+  outm$value2<-outndvi
   
   outm$variable<-as.numeric(substr(outm$variable,
                                    2,nchar(as.character(outm$variable))))
