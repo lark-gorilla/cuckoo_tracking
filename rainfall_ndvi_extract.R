@@ -90,6 +90,9 @@ for(i in tifz)
 }
 
 projection(rastack)
+#MODIS naming convention means that the date on the product name is the start
+# of the 16 day period iver which data is averaged see here for more:
+#https://gis.stackexchange.com/questions/218564/how-do-modis-products-naming-conventions-work
 
 
 library(reshape2)
@@ -128,15 +131,14 @@ for( i in 2012:2018)
   
   # loop to rep ndvi values over each of the 8 days they represent
   extrep<-NULL
-  for(i in 1:(ncol(ext2)-1))
+  for(j in 1:15) # limits to day 121
   {
-   extrep<-cbind(extrep, matrix(rep(ext2[,i], 8), ncol=8)) 
+   extrep<-cbind(extrep, matrix(rep(ext2[,j], 8), ncol=8)) 
   }
   extrep<-cbind(extrep, matrix(rep(ext2[,16], 5), ncol=5))
   
 
-  
-  
+  out<-data.frame(out, extrep) # add the ndvi data to rainfall df
   
   out$ID<-with(out, paste(ptt, year, SO_startDOY, sep="_"))
   
@@ -164,7 +166,7 @@ for( i in 2012:2018)
 
 # write out
 
-write.csv(int_out, 'data/spring_rainfall_by_stopover_2018.csv', row.names = F, quote=F)
+write.csv(int_out, 'data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', row.names = F, quote=F)
 
 
 ### Spatial extraction and analyses.
@@ -172,7 +174,7 @@ write.csv(int_out, 'data/spring_rainfall_by_stopover_2018.csv', row.names = F, q
 ### against rainfall of all other stopovers extract for n's date
 
 int_out2<-NULL
-for( i in 1:nrow(dat)) # or should I do per row
+for( i in 1:nrow(dat)) 
 {
   
   indat<-dat[i,]
