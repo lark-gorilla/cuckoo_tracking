@@ -61,7 +61,7 @@ print(raster(ras, layer=1))
 
 r2012<-subset(ras, 213:(213+124))
 r2013<-subset(ras, 579:(579+124))
-r2014<-subset(ras, 944:(944+123))
+r2014<-subset(ras, 944:(944+124))
 r2015<-subset(ras, 1309:(1309+124))
 r2016<-subset(ras, 1674:(1674+124))
 r2017<-subset(ras, 2040:(2040+124))
@@ -168,10 +168,93 @@ for( i in 2012:2018)
 
 write.csv(int_out, 'data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', row.names = F, quote=F)
 
+### Add in GRIMMS NDVI to compare
+
+int_out<-read.csv('data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', h=T)
+
+grimms<-read.csv('data/GRIMMS_0.25deg_NDVI_climatology.csv',h=T)
+grimms$LIS<-as.character(grimms$LIS)
+
+# need to join stopover ID to correct LIS square ..
+library(raster)
+
+# remake a long and lat raster and then join values to make key
+
+rs<-stack(raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80, 
+           crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
+           vals=rep((1:1440), 560)),
+
+raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80, 
+           crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
+           vals=sort(rep((1:560), 1440), decreasing=T)))
+
+
+ext<-extract(rs, dat[,7:8])
+
+# correct code nuances
+dat$LIS=paste0('0', ext[,1], "_", ext[,2])
+
+dat$ID<-paste(dat$ptt, dat$year, dat$SO_startDOY, sep="_")
+
+grimms$year<-substr(grimms$ORDINAL.DATE,1,4)
+
+dat_join<-dat[,c(9,22,23)]
+dat_join$year<-as.character(dat_join$year)
+
+
+# subsets grimms to only LIS squares that match in specific years
+#and adds corresponding ID column to grimms
+grimms<-inner_join(grimms, dat_join, by=c('LIS', 'year'))
+
+# add day of year variable to match int_out
+grimms$variable<-substr(grimms$ORDINAL.DATE,6,8)
+grimms$variable<-as.integer(grimms$variable)
+
+# split and rename/drop columns before merge 
+grimms$year<-NULL
+grimms$LIS<-NULL
+grimms$SAMPLE.COUNT<-NULL
+grimms$MEAN.COUNT<-NULL
+grimms$MEAN.VALUE<-NULL
+grimms$START.DATE <-NULL
+grimms$END.DATE <-NULL
+grimms$ORDINAL.DATE <-NULL
+
+gaqua<-grimms[grimms$sat=='AQUA',]
+
+gaqua$sat<-NULL
+names(gaqua)[1]<-'aquaNDVI'
+names(gaqua)[2]<-'aquaANOM'
+
+gterr<-grimms[grimms$sat=='TERR',]
+
+gterr$sat<-NULL
+names(gterr)[1]<-'terrNDVI'
+names(gterr)[2]<-'terrANOM'
+
+
+# join both aqua and terra to int_out, for the variable (days)
+# that are not matched in the grimms datast we get NA, need to fill down
+int2<-left_join(int_out, gaqua, by=c('ID', 'variable'))
+int2<-left_join(int2, gterr, by=c('ID', 'variable'))
+
+# the 'na.locf' function fills NA with previous value as desired
+library(zoo)
+int2$aquaNDVI<-na.locf(int2$aquaNDVI)
+int2$aquaANOM<-na.locf(int2$aquaANOM)
+
+int2$terrNDVI<-na.locf(int2$terrNDVI)
+int2$terrANOM<-na.locf(int2$terrANOM)
+
+
+write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_2018_dead.csv', row.names = F, quote=F)
+
 
 ### Spatial extraction and analyses.
 ### comparison between rainfall at start of stopover n
 ### against rainfall of all other stopovers extract for n's date
+
+##for spatial apporach calc square centre coords
 
 int_out2<-NULL
 for( i in 1:nrow(dat)) 
