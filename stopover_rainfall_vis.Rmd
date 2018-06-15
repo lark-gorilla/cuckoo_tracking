@@ -14,7 +14,7 @@ output: html_document
     setwd("N:/cuckoo_tracking")}
 
 
-int_out<-read.csv('data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', h=T)
+int_out<-read.csv('data/spring_rainfall_NDVI_GRIMMS_by_stopover_2018_dead.csv', h=T)
 
 dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
@@ -34,7 +34,7 @@ int_out$country<-factor(int_out$country, levels= c("Angola", "Democratic Republi
 int_out[is.na(int_out$value),]$value<-0
 int_out$ID2<-paste(int_out$SO_startDOY, int_out$country)
 
-for( i in 2012:2017)
+for( i in 2012:2018)
   {
   int1<-int_out[int_out$year==i,]
     
@@ -48,7 +48,9 @@ t2<-t1 %>% group_by(ID2) %>% dplyr::mutate(cumrf=cumsum(value))
 
 temp=ggplot(data=t2,aes(x=variable, y=value))+
 geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
-    geom_bar(data=t2, aes(x=variable, y=value2*500, group=1), stat='identity', fill='red', linetype=0, alpha=1/3)+
+    geom_line(data=t2, aes(x=variable, y=value2*500), colour='red')+
+  geom_line(data=t2, aes(x=variable, y=aquaNDVI*500), colour='cyan')+
+  geom_line(data=t2, aes(x=variable, y=terrNDVI*500), colour='orange')+
   geom_bar(stat='identity', colour='black')+
     geom_line(aes(y=cumrf), col='green', size=1)+
   facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
