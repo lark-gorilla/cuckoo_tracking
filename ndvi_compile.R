@@ -85,13 +85,32 @@ v2<-as.numeric(paste(exp1[,1], exp1[,2], sep='.'))
 r<-raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80, 
        crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs', vals=v2)
 
-writeRaster(r, "C:/cuckoo_tracking/data/spatial/marks_LIS_ras.tif")
+writeRaster(r, "C:/cuckoo_tracking/data/spatial/marks_LIS_ras.tif", overwrite=T)
+
+#make individual rasters as there is some issue with storing 
+# combined values as a decimal
+
+r1<-raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80, 
+          crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
+          vals=rep((1:1440), 560))
+
+writeRaster(r1, "C:/cuckoo_tracking/data/spatial/marks_LIS_ras_lon.tif", overwrite=T)
+
+r2<-raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80, 
+          crs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
+          vals=sort(rep((1:560), 1440), decreasing=T))
+
+writeRaster(r2, "C:/cuckoo_tracking/data/spatial/marks_LIS_ras_lat.tif", overwrite=T)
+
+#stack em
+rs<-stack(r, r1, r2)
+
 
 # nice to have a grid but huge file for whole world, 
 # so just subset to WA
 
-r2<-crop(r, extent(c(-18, 20, -10, 12)))
-plot(r2)
+r3<-crop(rs, extent(c(-18, 20, -10, 12)))
+plot(r3)
 
 map('world', add=T)
 r.poly <- rasterToPolygons(r2, dissolve=F )
@@ -111,13 +130,84 @@ writeOGR(obj=r.poly, dsn="spatial",
 # just take the one over which the point falls. The important thing to rememebr is stopover
 # points are the median location of the stopover (which can cover up to 50km between points)
 
+# Update, actually I'm gonna pull data for all the cells in the WA region incase needed for 
+# different analyses later
 
+library(rgdal)
 
-https://glam1.gsfc.nasa.gov/wui/4.1.0/chart.html?sat=MYD&mean=2003-2015&layer=NDVI&crop=NONE&type=LIS&n=1&numIds=1&level=null&initYr=2018&id0=0718_269
+setwd("C:/cuckoo_tracking/data")
+r.poly<-readOGR(dsn="spatial",
+         layer="marks_LIS_grid")
 
+data("wrld_simpl", package = 'maptools')
 
-download.file(url='https://glam1.gsfc.nasa.gov/_/csv_2.1?src=https%3A%2F%2Fglam1.gsfc.nasa.gov%2Ftbl%2Fv4%2FMYD%2FGMYD09Q1.6v1.NDVI.MOD44W_2009_land.LIS%2Ftxt%2FGMYD09Q1.6v1.NDVI.MOD44W_2009_land.LIS.0718_269.tbl.txt',
-              destfile = 'C:/cuckoo_tracking/sourced_data/GRIMMS_NDVI/test.csv')
+plot(r.poly)
+plot(wrld_simpl, add=T, border=2)
+r.poly2<-r.poly[wrld_simpl,] # simple clip
+plot(r.poly2, add=T, border=3) # cool
 
+indexes<-r.poly2@data$layer_1
+# replace . with _ so to match website 
+indexes<-gsub(pattern="\\.", x=as.character(indexes), replacement="_")
+
+# fix to get include indexes that have 0 at end
+indexes<-ifelse(nchar(indexes)==6, paste0(indexes, '0'), indexes)
+
+# ok so now we pull the csv for each of these 0.25degree cells from the GRIMMS
+# server there are ~ 6000 indexes so 6000 files to download. IF a LIS square I have constructed
+# does not exist on the server ( near coast maybe) it downloads a blank csv, these
+# should be identifiable after as they are smaller (bytes rather than Kb) so cen be deleated)
+
+for(i in indexes)
+{
+download.file(url=paste0('https://glam1.gsfc.nasa.gov/_/csv_2.1?src=https%3A%2F%2Fglam1.gsfc.nasa.gov%2Ftbl%2Fv4%2FMYD%2FGMYD09Q1.6v1.NDVI.MOD44W_2009_land.LIS%2Ftxt%2FGMYD09Q1.6v1.NDVI.MOD44W_2009_land.LIS.',
+                         '0',i,'.tbl.txt'),
+              destfile = paste0('C:/cuckoo_tracking/sourced_data/GRIMMS_NDVI/AQUA_','0',i,'.csv'))
+}
+# note the 0 before index i in the url to match the website
+
+# same for TERRA
+
+for(i in indexes)
+{
+  download.file(url=paste0('https://glam1.gsfc.nasa.gov/_/csv_2.1?src=https%3A%2F%2Fglam1.gsfc.nasa.gov%2Ftbl%2Fv4%2FMOD%2FGMOD09Q1.6v1.NDVI.MOD44W_2009_land.LIS%2Ftxt%2FGMOD09Q1.6v1.NDVI.MOD44W_2009_land.LIS.',
+                           '0',i,'.tbl.txt'),
+                destfile = paste0('C:/cuckoo_tracking/sourced_data/GRIMMS_NDVI/TERRA_','0',i,'.csv'))
+}
+# note the 0 before index i in the url to match the website
+
+# now comile into one dataset
+
+filez<-list.files('C:/cuckoo_tracking/sourced_data/GRIMMS_NDVI')
+
+out<-NULL
+for(i in filez)
+{
+temp2<-read.csv(paste0('C:/cuckoo_tracking/sourced_data/GRIMMS_NDVI/',i), h=T, skip=12, na.strings='#N/A')
+
+temp2$sat=substr(i, 1, 4)
+temp2$LIS=substr(i, 6, 13)
+
+temp2$SOURCE<-NULL
+temp2$year<-as.numeric(substr(temp2$ORDINAL.DATE,1,4))
+temp2<-temp2[temp2$year>2011,]
+temp2$year<-NULL
+temp2$ord<-as.numeric(substr(temp2$ORDINAL.DATE,6,8))
+temp2<-temp2[temp2$ord<153,]
+temp2$ord<-NULL
+out<-rbind(out, temp2)
+print(i)
+}
+
+# quick fix cos of AQUA nchar=4, TERRA nchar=5 error cock up
+out[out$sat=='TERR',]$LIS<-out[out$sat=='AQUA',]$LIS
+
+write.csv(out, 'C:/cuckoo_tracking/data/GRIMMS_0.25deg_NDVI_climatology.csv', quote=F, row.names=F)
+
+# A final extract from the http://maps.elie.ucl.ac.be/CCI/viewer/index.php viewer
+# this is mainly to get landcover but also has NDVI and fire stuff
+
+# alternate attempt to grab huge raster and subset to west africa to 
+# reduce size
 
 
