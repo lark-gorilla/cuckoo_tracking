@@ -207,11 +207,11 @@ ext<-extract(rs, dat[,23:24]) # detailed coords
 # correct code nuances
 dat$LIS=paste0('0', ext[,1], "_", ext[,2])
 
-dat$ID<-paste(dat$ptt, dat$year, dat$SO_startDOY, sep="_")
+dat$ID<-paste(dat$ptt, dat$year, dat$SO_startDOY, dat$timestamp,sep="_")
 
 grimms$year<-substr(grimms$ORDINAL.DATE,1,4)
 
-dat_join<-dat[,c(9,22,23)]
+dat_join<-dat[,c(9,25,26)]
 dat_join$year<-as.character(dat_join$year)
 
 
@@ -248,6 +248,11 @@ names(gterr)[2]<-'terrANOM'
 
 # join both aqua and terra to int_out, for the variable (days)
 # that are not matched in the grimms datast we get NA, need to fill down
+
+#redo ID to include timestamp
+int_out$ID<-paste(int_out$ptt, int_out$year,
+                  int_out$SO_startDOY, int_out$timestamp,sep="_")
+
 int2<-left_join(int_out, gaqua, by=c('ID', 'variable'))
 int2<-left_join(int2, gterr, by=c('ID', 'variable'))
 
@@ -260,7 +265,7 @@ int2$terrNDVI<-na.locf(int2$terrNDVI)
 int2$terrANOM<-na.locf(int2$terrANOM)
 
 
-write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_2018_dead.csv', row.names = F, quote=F)
+write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
 
 ### Spatial extraction and analyses.
