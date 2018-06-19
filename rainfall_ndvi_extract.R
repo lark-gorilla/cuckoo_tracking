@@ -10,15 +10,20 @@ if(Sys.info()['nodename']=="D9L5812"){
 
 # Get cuckoo data
 
-dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv', h=T)
-dat$dead<-0
-dat1<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv', h=T)
-dat1$dead<-1
-dat1$biome1<-NULL
-dat1$biome2<-NULL
+#dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv', h=T)
+#dat$dead<-0
+#dat1<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv', h=T)
+#dat1$dead<-1
+#dat1$biome1<-NULL
+#dat1$biome2<-NULL
 
-dat<-rbind(dat,dat1)
+#dat<-rbind(dat,dat1)
 #remove non- west african rows
+
+# Use detailed coord data now for extract
+
+dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords.csv', h=T)
+
 
 dat<-dat[which( ! dat$country%in% c('Algeria', 'France', 'Italy', 'Morocco' ,'Spain',
                                     'United Kingdom', 'Portugal')),]
@@ -79,6 +84,8 @@ tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6
 #order them by date rather than satellite (Terra and Aqua)
 tifz<-tifz[order(substr(tifz, 14,21))]
 
+tifz<-tifz[-grep("xml", tifz)] # remove qgus xml additional files
+
 for(i in tifz)
 {
   if(which(i==tifz)==1){
@@ -111,7 +118,10 @@ for( i in 2012:2018)
   ras_temp<-get(paste0('r', i))
   
   # add 50 km buffer as per stopover definition. buffer=50000
-  ext<-extract(ras_temp, indat[,7:8], buffer=50000, fun=median)
+  #ext<-extract(ras_temp, indat[,7:8], buffer=50000, fun=median)
+  
+  ext<-extract(ras_temp, indat[,23:24]) # no buffer for detailedcoord points as most
+  # are lc class 0-3 so < 1500m
   
   ext[ext<0]<-NA # remove negative values '-99'
   
@@ -119,13 +129,15 @@ for( i in 2012:2018)
   
   out<-data.frame(ptt=indat$ptt, country=indat$country, year=i, 
                   SO_startDOY=indat$SO_startDOY, 
-                  SO_endDOY=indat$SO_endDOY, ext)
+                  SO_endDOY=indat$SO_endDOY, timestamp=indat$timestamp, ext)
   
   ## NDVI  extract
   
   ndvi_temp<-subset(rastack, which(substr(tifz, 14,17)==i))
   
-  ext2<-extract(ndvi_temp, indat[,7:8], buffer=50000, fun=median, na.rm=T)
+  #ext2<-extract(ndvi_temp, indat[,7:8], buffer=50000, fun=median, na.rm=T)
+  
+  ext2<-extract(ndvi_temp, indat[,23:24], na.rm=T) # no buffer
   
   ext2<-ext2*0.0001 # apply scaling to get NDVI from -1 to 1
   
@@ -143,7 +155,7 @@ for( i in 2012:2018)
   out$ID<-with(out, paste(ptt, year, SO_startDOY, sep="_"))
   
   outm<-melt(out, id.vars=c('ID', 'ptt', 'country', 'year',
-                            'SO_startDOY', 'SO_endDOY'))
+                            'SO_startDOY', 'SO_endDOY', 'timestamp'))
   
   # reconstruct data.frame to have rainfall and ndvi
   outndvi<-outm[((nrow(out)*125)+1):((nrow(out)*125)*2),]$value
@@ -166,11 +178,11 @@ for( i in 2012:2018)
 
 # write out
 
-write.csv(int_out, 'data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', row.names = F, quote=F)
+write.csv(int_out, 'data/spring_rainfall_NDVI_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
 ### Add in GRIMMS NDVI to compare
 
-int_out<-read.csv('data/spring_rainfall_NDVI_by_stopover_2018_dead.csv', h=T)
+int_out<-read.csv('data/spring_rainfall_NDVI_by_stopover_detailcoords_2018_dead.csv', h=T)
 
 grimms<-read.csv('data/GRIMMS_0.25deg_NDVI_climatology.csv',h=T)
 grimms$LIS<-as.character(grimms$LIS)
@@ -189,7 +201,8 @@ raster(nrows=(140*4), ncols=(360*4), xmn=-180, xmx=180, ymn=-60, ymx=80,
            vals=sort(rep((1:560), 1440), decreasing=T)))
 
 
-ext<-extract(rs, dat[,7:8])
+#ext<-extract(rs, dat[,7:8])
+ext<-extract(rs, dat[,23:24]) # detailed coords
 
 # correct code nuances
 dat$LIS=paste0('0', ext[,1], "_", ext[,2])
