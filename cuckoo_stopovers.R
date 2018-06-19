@@ -71,6 +71,9 @@ dat2<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv"
 dat2$biome1<-NULL
 dat2$biome2<-NULL
 
+dat1$dead=0
+dat2$dead=1
+
 dat<-rbind(dat1, dat2)
 
 #do subset using join
