@@ -62,13 +62,48 @@ write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoo
 ## read in rivers layer
 
 library(rgdal)
+library(raster)
 
 setwd("C:/cuckoo_tracking/sourced_data/rivers")
 rivers<-readOGR(layer="rivers_africa_37333",
                 dsn="rivers_africa_37333") # different linux/windows
 
-projection(rivers)
+spdat<-SpatialPoints(dat[,23:24], proj4string = CRS(projection(rivers)))
 
-library(geosphere)
+#crop rivre layer
 
-dat$riverDist<-dist2Line(dat[, 23:24], rivers)
+library(sf)
+
+riversSF <- st_as_sf(rivers)
+spdatSF <- st_as_sf(spdat)
+rectangleSF <- st_as_sf(as(raster::extent(spdat)+3, "SpatialPolygons"))
+st_crs(rectangleSF)<-st_crs(spdatSF)
+
+
+plot(st_geometry(rectangleSF), border=2)
+plot(st_geometry(spdatSF), add=T)
+
+riversCROP <- st_intersection(riversSF, rectangleSF)
+
+plot(st_geometry(riversCROP['Strahler']))
+plot(st_geometry(spdatSF), add=T, col=2)
+
+
+# coerce back to sp
+riversCROP <- as(riversCROP, 'Spatial')
+
+#reporject both
+
+spdatproj<-spTransform(spdat, CRS=CRS("+proj=aea +lat_1=20 +lat_2=-23 +lat_0=0 +lon_0=25 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
+
+
+riversproj<-spTransform(riversCROP, CRS=CRS("+proj=aea +lat_1=20 +lat_2=-23 +lat_0=0 +lon_0=25 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
+
+for(i in 1:nrow(dat))
+{
+dat[i,]$d_river<-gDistance(spdatproj[i,], riversproj)
+print(i)
+}
+
+write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", quote=F, row.names=F)
+
