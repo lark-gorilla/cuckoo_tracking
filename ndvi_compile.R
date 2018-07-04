@@ -49,22 +49,94 @@ plot(raster::subset(rastack, 1))
 
 library(gdalUtils)
 
-tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI")
+#tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI")
+
+# And for quality fields
+tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual")
 
 #order them by date rather than satellite (Terra and Aqua)
-tifz<-tifz[order(substr(tifz, 14,21))]
+#tifz<-tifz[order(substr(tifz, 14,21))]
+#
+tifz<-tifz[order(substr(tifz, 17, 24))]
+
+p<-projection(raster(paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual/",tifz[1])))
 
 for(i in tifz)
 {
-  gdalwarp(srcfile=paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI/",i),
-           dstfile=paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS/",i),
-           s_srs=projection(rastack),
+  gdalwarp(srcfile=paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual/",i),
+           dstfile=paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual_WGS/",i),
+           s_srs=p,
            t_srs='+proj=longlat +ellps=WGS84 +datum=WGS84 +no_defs',
            output_Raster=TRUE,
            overwrite=TRUE,verbose=TRUE)
   print(i)  
 }
 # much faster!
+
+# Ok now we apply a savitzky-golay-filter to smooth the NDVI timeseries
+# we will try two methods:
+#1) using raw ndvi data and
+#2) after masking out poor quality pixels
+#https://matinbrandt.wordpress.com/2014/12/02/smoothingfiltering-a-ndvi-time-series-using-a-savitzky-golay-filter-and-r/
+
+#stack up data
+# make quality data list first
+tifz<-list.files("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual")
+
+tifz<-tifz[order(substr(tifz, 17, 24))]
+#remove last one
+tifz<-tifz[1:124]
+
+# then make ndvi list from it (cos no 2011 quality data but is ndvi data)
+ndvitifz<-gsub("QA_qual", "NDVI", tifz)
+
+for(i in tifz)
+{
+  if(which(i==tifz)==1){
+    qastack<-raster(paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual_WGS/",i))
+    ndvistack<-raster(paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS/",ndvitifz[which(i==tifz)]))
+    
+  }else{
+   
+    qastack<-stack(qastack, paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual_WGS/",i))  
+    ndvistack<-stack(ndvistack, paste0("C:/cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/NDVI_WGS/",ndvitifz[which(i==tifz)])) 
+  }
+  print(i)  
+}
+
+# recalss # too slow to apply on the stack so 
+#qastack[qastack>1]<-NA
+#qastack[qastack==0]<-1
+
+# finally achieved using gdal_calc from osgeo4w cmd line
+
+#cd /cuckoo_tracking/sourced_data/MODIStsp_NDVI/VI_16Days_1Km_v6/QA_qual_WGS
+
+#dir
+
+#for  %i in (*.tif) do gdal_calc -A  "C:\cuckoo_tracking\sourced_data\MODIStsp_NDVI\VI_16Days_1Km_v6\QA_qual_WGS\%i" --outfile="C:\cuckoo_tracking\sourced_data\MODIStsp_NDVI\VI_16Days_1Km_v6\QA_qual_WGS_mask\%i" --calc="1*(A==0)+1*(A==1)" --NoDataValue=0 --overwrite
+
+
+
+# mask out areas that were quality level 2 or 3
+maskedndvi<-ndvistack*qastack
+
+# run filter per year on raw and masked ndvi datasets
+
+ndvi_yr<-subset(ndvistack, which(substr(tifz, 14,17)==2012))
+
+
+library(signal)
+library(zoo)
+
+fun <- function(x) {
+  v=as.vector(x)
+  z=substituteNA(v, type=”mean”)
+  MODIS.ts2 = ts(z, start=c(2005,1), end=c(2010,23), frequency=23)
+  x=sgolayfilt(MODIS.ts2, p=1, n=3, ts=30)
+}
+
+MODIS.filtered <- calc(MODIS, fun)
 
 
 ##### Different method !
