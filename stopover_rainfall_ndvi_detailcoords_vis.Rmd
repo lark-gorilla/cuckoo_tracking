@@ -18,7 +18,7 @@ int_out<-read.csv('data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_201
 
 dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
-lc<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext.csv", h=T)
+lc<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", h=T)
 
 
 
@@ -51,7 +51,8 @@ t1<-int_out[int_out$ptt==j & int_out$year==i,]
 lc1<-lc[lc$ptt==j & lc$year==i,]
 
 lc1<-lc1 %>% group_by(SO_startDOY, country) %>% dplyr::summarise(Tree=mean(Trees, na.rm=T), Grass=mean(Grasslands, na.rm=T), Crops=mean(Croplands, na.rm=T), Shrub=mean(Shrubs, na.rm=T),Bare=mean(Bare.areas, na.rm=T), Urban=mean(Built.up.areas, na.rm=T),
-  Aquatic=mean(Aquatic.veg.reg.flooded, na.rm=T), Water=mean(Open.water, na.rm=T))
+  Aquatic=mean(Aquatic.veg.reg.flooded, na.rm=T), Water=mean(Open.water, na.rm=T), D_riv=
+    mean(d_river), D_riv2=mean(d_river_str2))
                                                         
                                                              lc1[,3:10]<-round(lc1[,3:10]/rowSums(lc1[,3:10], na.rm=T) *100)                             
 
@@ -67,7 +68,8 @@ for(k in 1:nrow(lc1))
   tempy<-paste(names(lctemp)[l], ": ", lctemp[l], "% \n", sep="")
     lcouty<-paste(lcouty, tempy)
 }
-
+lcouty<-paste(lcouty, "D riv:", round(lc1[k,11]/1000,1), "km \n", "D riv2:", round(lc1[k,12]/1000,1), "km \n")
+  
 lc1[k,]$label<-lcouty
   
 }                                                              
