@@ -99,11 +99,18 @@ spdatproj<-spTransform(spdat, CRS=CRS("+proj=aea +lat_1=20 +lat_2=-23 +lat_0=0 +
 
 riversproj<-spTransform(riversCROP, CRS=CRS("+proj=aea +lat_1=20 +lat_2=-23 +lat_0=0 +lon_0=25 +x_0=0 +y_0=0 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"))
 
-for(i in 1:nrow(dat))
-{
-dat[i,]$d_river<-gDistance(spdatproj[i,], riversproj)
-print(i)
-}
+# byid creaes matrix of min distances from every river to point
+rivers2<-gDistance(spdatproj, riversproj, byid=T)
+
+# apply function to find the nearest river from the matrix to each point
+dat$d_river<-apply(rivers2, 2, min)
+
+# do sma efor Strahler order => 2 indicating larger rivers
+
+rivers2<-gDistance(spdatproj, riversproj[riversproj$Strahler>1,], byid=T)
+
+# apply function to find the nearest river from the matrix to each point
+dat$d_river_str2<-apply(rivers2, 2, min)
 
 write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", quote=F, row.names=F)
 

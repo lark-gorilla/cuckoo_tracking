@@ -268,6 +268,10 @@ int2$terrANOM<-na.locf(int2$terrANOM)
 write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
 
+
+
+## OLD
+
 ### Spatial extraction and analyses.
 ### comparison between rainfall at start of stopover n
 ### against rainfall of all other stopovers extract for n's date
