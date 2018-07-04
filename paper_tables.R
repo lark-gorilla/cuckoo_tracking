@@ -23,7 +23,7 @@ dat$mig_length<-dat$arrive_breeding-dat$DEPwestAF
 dat$WA_dur<-dat$DEPwestAF-dat$DEPcentralAF
 qplot(data=dat, x=year, y=WA_dur) # some large ones
 # hmm there are discrepencies.. use sumSOwestAF as conservative estimate
-dat$DEPwestAF-dat$DEPcentralAF - dat$sumSOwestAF
+dat$WA_dur<-dat$DEPcentralAF - dat$sumSOwestAF
 
 # correct em
 dat[dat$ptt==115586 & dat$year==2014,]$sumSOwestAF<-22.19065+4
@@ -38,6 +38,15 @@ dat$year<-relevel(dat$year, ref='2015')
 # relevel to central well sampled year
 dat$breeding_loc<-relevel(dat$breeding_loc, ref='Thetford Forest')
 
+## variable for sahara crossing length - check!
+
+dat$sahara_arr<-dat$DEPnorthAF-dat$sumSOnorthAF
+
+dat$sahara_arr<-ifelse(is.na(dat$sahara_arr),
+                       dat$DEPeurope-dat$sumSOeurope,
+                       dat$DEPnorthAF-dat$sumSOnorthAF)
+
+dat$sahara_mig<-dat$sahara_arr-dat$DEPwestAF
 
 library(lme4)
 
