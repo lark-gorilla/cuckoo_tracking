@@ -76,6 +76,8 @@ dat2$dead=1
 
 dat<-rbind(dat1, dat2)
 
+#write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv", quote=F, row.names=F)
+
 #do subset using join
 
 #drop uneeded columns from stopopvers
@@ -309,17 +311,67 @@ write.csv(dat, "data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", q
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel
 
+## cleaning up data for Durham uni provision
+
+dat<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
+
+# remove unhelpful median rounded month and year
+
+dat$SO_month<-NULL
+dat$SO_year<-NULL
+
 ## Manual fill of NA countries from GIS lookup
 
 dat[which(is.na(dat$country)),]
 dat[2,]$country<-'Belgium'
 dat[c(426,442),]$country<-'United Kingdom'
-dat[c(426,442),]$country<-'United Kingdom'
 dat[193,]$country<-'Netherlands'
 dat[207,]$country<-'United Kingdom'
-dat[833,]$country<-'United Kingdom'
-dat[568,]$country<-'Spain'
+dat[846,]$country<-'United Kingdom'
 dat[570,]$country<-'United Kingdom'
+
+#add julian
+
+dat$SO_start <- as.POSIXct(strptime(dat$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$SO_end <- as.POSIXct(strptime(dat$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+library(lubridate)
+
+dat$SO_startDOY<-yday(dat$SO_start) 
+
+dat$SO_endDOY<-yday(dat$SO_end) 
+
+dat$SO_length_hr<-dat$SO_days*24
+
+dat$SO_length_discrete_day<-(dat$SO_endDOY-dat$SO_startDOY)+1
+
+dat[dat$SO_length_discrete_day<0  & 
+      substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_length_discrete_day<-365-
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_startDOY)+
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_endDOY)+1
+
+# for leap years
+dat[dat$SO_length_discrete_day<0  & 
+      substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_length_discrete_day<-366-
+  (dat[dat$SO_length_discrete_day<0  & 
+        substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_startDOY)+
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_endDOY)+1
+
+# remove erroneous stopovers (<1.5d) from skipped duty cycle
+
+dat[dat$SO_length_discrete_day<3,]
+
+dat<-dat[dat$SO_length_discrete_day>2,]
+
+dat$SO_days<-NULL # remove
+
+# now do manual edit to sort final death stopovers in excel
+write.csv(dat, "data/stopover_table_bestofday_2018_1daymin_recalc_biomes_EXPORT.csv", quote=F, row.names=F)
+
+
 
 # Exporting as KML files 
 
