@@ -233,6 +233,25 @@ grimms$START.DATE <-NULL
 grimms$END.DATE <-NULL
 grimms$ORDINAL.DATE <-NULL
 
+## extra code to fill the relicates of 'variable' ahead of the join 
+grimms2<-do.call('rbind', list(grimms,grimms,grimms,grimms,
+                              grimms,grimms,grimms,grimms))
+
+grimms2<-grimms2[order(grimms2$ID, grimms2$variable),]
+
+grimms2<-grimms2[grimms2$variable!=145,] # remove dataset 145 (d145-153)
+# as not needed, actually above 125 but anyways....
+
+# repeat sequence 1:144 for each ID (times 2 cos both satellites)
+grimms2$v2<-rep((sort(rep(1:144, 2))), length(unique(grimms2$ID)))
+
+#set grimms2 as grimms and v2 as variable
+grimms<-grimms2
+grimms$variable<-grimms$v2
+grimms$v2<-NULL
+
+
+# split into seperate satellites
 gaqua<-grimms[grimms$sat=='AQUA',]
 
 gaqua$sat<-NULL
@@ -256,14 +275,8 @@ int_out$ID<-paste(int_out$ptt, int_out$year,
 int2<-left_join(int_out, gaqua, by=c('ID', 'variable'))
 int2<-left_join(int2, gterr, by=c('ID', 'variable'))
 
-# the 'na.locf' function fills NA with previous value as desired
-library(zoo)
-int2$aquaNDVI<-na.locf(int2$aquaNDVI)
-int2$aquaANOM<-na.locf(int2$aquaANOM)
-
-int2$terrNDVI<-na.locf(int2$terrNDVI)
-int2$terrANOM<-na.locf(int2$terrANOM)
-
+# legit NAs from GIMMS dataset
+which(!is.na(int2$aquaNDVI))
 
 write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
