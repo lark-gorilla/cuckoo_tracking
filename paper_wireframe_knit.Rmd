@@ -1,0 +1,51 @@
+---
+title: "Paper Wireframe"
+author: "Mark Miller"
+date: "10 July 2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=F}
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+
+dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
+
+# set NA or manually correct cuckoo depature dates that
+# are incorrect, from manual examination
+
+dat[dat$ptt==115586 & dat$year==2014,]$DEPwestAF<-106
+dat[dat$ptt==134955 & dat$year==2015,]$DEPwestAF<-NA
+dat[dat$ptt==134956 & dat$year==2015,]$DEPwestAF<-NA
+
+# and dead ones
+dat[dat$ptt==128296 & dat$year==2014,]$DEPwestAF<-NA
+
+```
+
+## Aims
+
+Focus on cuckoo spring departure from West Africa. Address several questions:
+
+Q1) Is cuckoo arrival in the UK constrained by their departure from West Africa ?
+
+Q2) To what extent is cuckoo departure from West Africa controlled by endogenous or environmental factors ?
+
+Q3) What are the mechanisms that underpin potential controlling factors ?
+
+## Methods 
+
+## Results
+
+#Q1)  
+
+```{r pressure, echo=FALSE}
+plot(pressure)
+```
+
+
