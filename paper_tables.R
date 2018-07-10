@@ -2,6 +2,13 @@
 # Making output tables for cuckoo paper. Initially descriptive tables
 # of migration metrics from previously calculated stopover summary table
 
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+#### !!!!!!!!!!!!!!!!!! ####
+
 # read in most complete dataset
 
 dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
@@ -18,6 +25,111 @@ dat[dat$ptt==128296 & dat$year==2014,]$DEPwestAF<-NA
 
 #set up migration length variable
 dat$mig_length<-dat$arrive_breeding-dat$DEPwestAF
+
+qplot(data=dat, x=DEPwestAF, y=mig_length)
+
+
+qplot(data=dat, x=DEPwestAF, y=WA_mig_len, colour=breeding_loc)+facet_wrap(~year)
+
+library(lme4)
+
+m4<-lmer(arrive_breeding~DEPwestAF+
+           (1|ptt)+(1|year), data=dat)
+
+summary(m4)
+
+m4c<-lm(arrive_breeding~
+          DEPwestAF, data=dat)
+
+
+# plot
+
+newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
+newdat$p1<-predict(m4, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
+vcv<-vcov(m4c)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')+
+  xlab("Departure date West Africa (DOY)")+
+  ylab("Arrival at breeding grounds (DOY)")+
+  theme_classic()
+
+library(car)
+Anova(m4, test.statistic = 'F')
+
+m4<-lmer(arrive_breeding~DEPwestAF+
+           (1|ptt)+(1|year), data=dat)
+
+summary(m4)
+
+m4c<-lm(arrive_breeding~
+          DEPwestAF, data=dat)
+
+# check if we can drop year randome effect
+anova(m4b, m4c)
+
+# plot
+
+newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
+newdat$p1<-predict(m4, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
+vcv<-vcov(m4)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')+
+  xlab("Departure date West Africa (DOY)")+
+  ylab("Arrival at breeding grounds (DOY)")+
+  theme_bw()
+
+library(car)
+Anova(m4, test.statistic = 'F')
+
+# And for migration length
+
+m5<-lmer(mig_length~DEPwestAF+
+           (1|ptt)+(1|year), data=dat)
+
+summary(m5)
+
+m5c<-lm(mig_length~
+          DEPwestAF, data=dat)
+
+# plot
+
+newdat<-data.frame(DEPwestAF=70:130, mig_length=1)
+newdat$p1<-predict(m5, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(mig_length~DEPwestAF, data=newdat)
+vcv<-vcov(m5)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat, x=DEPwestAF, y=mig_length)+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')+
+  xlab("Departure date West Africa (DOY)")+
+  ylab("Migration length (days)")+
+  theme_bw()
+
+library(car)
+Anova(m5, test.statistic = 'F')
+
+
 # set up duration in WA variable, different to SOdurWA because
 # it accounts for time assumed in WA but no stopover recorded.
 dat$WA_dur<-dat$DEPwestAF-dat$DEPcentralAF
@@ -149,4 +261,105 @@ out<-dat2 %>% group_by(ptt) %>%
 write.csv(out,  'C:/cuckoo_tracking/results/multiyear_ptt_summary.csv', quote=F, row.names=F)                   
                    
 
+## jumping ahead, test NDVI anom
 
+env<-read.csv('data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+# summarise data for each stopover so that value per date is the mean
+# of the detail coords values
+
+library(dplyr)
+
+dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
+            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
+            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
+            terrANOM=mean(terrANOM, na.rm=T))
+
+dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
+dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
+
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+
+# rearrange
+
+dat2<- dat2 %>% select(year, ptt, SO_startDOY, SO_endDOY, country, everything())
+
+dat2.1<-subset(dat2, cuck_pres=='Y')
+
+dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
+  summarise(cumrf=mean(cumrf, na.rm=T),
+            NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
+            terrANOM=mean(terrANOM, na.rm=T),
+            SOlen=first(SO_endDOY)-first(SO_startDOY))
+
+dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
+  summarise(cumrf=last(cumrf),
+            NDVI= last(NDVI), 
+            aquaNDVI=last(aquaNDVI),
+            aquaANOM=last(aquaANOM),
+            terrNDVI=last(terrNDVI),
+            terrANOM=last(terrANOM),
+            last_SOstart=last(SO_startDOY))
+
+dat3<-full_join(dat, dat2.3, by=c('ptt', 'year'))
+
+m6<-lmer(DEPwestAF~aquaANOM+
+           (1|ptt)+(1|year), data=dat3)
+
+summary(m6)
+
+# plot
+
+newdat<-data.frame(aquaANOM=seq(-0.15,0.15, 0.005), DEPwestAF=1)
+newdat$p1<-predict(m6, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(DEPwestAF~aquaANOM, data=newdat)
+vcv<-vcov(m6)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat3, x=aquaANOM, y=DEPwestAF)+
+  geom_line(data=newdat, aes(x=aquaANOM, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=aquaANOM, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=aquaANOM, y=uc), colour='red', linetype='dashed')+
+  xlab("NDVI anomoly")+
+  ylab("Departure date West Africa (DOY)")+
+  theme_bw()
+
+
+Anova(m6, test.statistic = 'F')
+
+m7<-lmer(DEPwestAF~cumrf+
+           (1|ptt)+(1|year), data=dat3)
+
+newdat<-data.frame(cumrf=seq(0:800), DEPwestAF=1)
+newdat$p1<-predict(m7, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(DEPwestAF~cumrf, data=newdat)
+vcv<-vcov(m7)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat3, x=cumrf, y=DEPwestAF)+
+  geom_line(data=newdat, aes(x=cumrf, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=cumrf, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=cumrf, y=uc), colour='red', linetype='dashed')+
+  xlab("cumulative rainfall (mm)")+
+  ylab("Departure date West Africa (DOY)")+
+  theme_bw()
+
+Anova(m7, test.statistic = 'F')
+
+dat2<-dat2 %>% group_by(year, ptt) %>%
+  summarise(cumrf=mean(c(last(cumrf),nth(cumrf, -2))),
+            NDVI= mean(c(last(NDVI),nth(NDVI, -2))), 
+            aquaNDVI=mean(c(last(aquaNDVI),nth(aquaNDVI, -2))),
+            aquaANOM=mean(c(last(aquaANOM), nth(aquaANOM, -2))),
+            terrNDVI=mean(c(last(terrNDVI),nth(terrNDVI, -2))),
+            terrANOM=mean(c(last(terrANOM), nth(terrANOM, -2))))
