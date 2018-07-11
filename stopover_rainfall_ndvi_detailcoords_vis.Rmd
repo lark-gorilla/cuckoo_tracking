@@ -88,6 +88,9 @@ geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
     geom_line(data=t2, aes(x=variable, y=value2*500), colour='red')+
   geom_line(data=t2, aes(x=variable, y=aquaNDVI*500), colour='cyan')+
   geom_line(data=t2, aes(x=variable, y=terrNDVI*500), colour='orange')+
+    geom_line(data=t2, aes(x=variable, y=aquaANOM*1000+200), colour='cyan', linetype=2)+
+    geom_line(data=t2, aes(x=variable, y=terrANOM*1000+200), colour='orange', linetype=2)+
+  geom_hline(yintercept=200)+
   geom_bar(stat='identity', colour='black')+
     geom_line(aes(y=cumrf), col='green', size=1)+
   facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
