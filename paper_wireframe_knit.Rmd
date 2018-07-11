@@ -10,6 +10,11 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r, echo=F}
+library('lme4')
+library('car')
+library('ggplot2')
+
+
 if(Sys.info()['nodename']=="D9L5812"){
   setwd("C:/cuckoo_tracking")}else{
     setwd("N:/cuckoo_tracking")}
@@ -42,10 +47,181 @@ Q3) What are the mechanisms that underpin potential controlling factors ?
 
 ## Results
 
-#Q1)  
+### Q1)  
 
-```{r pressure, echo=FALSE}
-plot(pressure)
+Arrival at UK breeding grounds is less correlated with earlier stages of spring migration, but appears to be still be influenced by movements in West Africa.
+
+```{r, echo=F, fig.cap='Correlation between arrival at UK breeding grounds and stages of spring migration: departure from furthest southerly wintering latitude (pink); Central Africa (cyan); West Africa (blue); North Africa (green); Europe (red); and arrival on UK mainland (black).', warning=F, message=F}
+
+ggplot(data=dat, aes(y=arrive_breeding))+
+  geom_point(aes(x=arrive_uk), col=1, shape=1)+
+  geom_point(aes(x=DEPeurope), col=2, shape=1)+
+  geom_point(aes(x=DEPnorthAF), col=3, shape=1)+
+  geom_point(aes(x=DEPwestAF), col=4, shape=1)+
+  geom_point(aes(x=DEPcentralAF), col=5, shape=1)+
+  geom_point(aes(x=depart_winterSO), col=6, shape=1)+
+  xlim(c(-71, 142))+ylab('Arrival at breeding grounds DOY')+
+  xlab('DOY')+theme_classic()
+  
+```
+
+Stats confirm that date of departure from West Africa significantly impacts subsequent date of arrival at Uk breeding grounds, but prior stages of spring migration do not.
+
+```{r, echo=F}
+d1<-dat
+  names(d1)[10]<-'arrive.breeding.uk'
+  names(d1)[4]<-'depart.wintering'
+  names(d1)[5]<-'depart.central.africa'
+  names(d1)[6]<-'depart.west.africa'
+
+m1<-lmer(arrive.breeding.uk~depart.wintering+depart.central.africa+depart.west.africa+(1|year)+(1|ptt), data=d1)
+
+Anova(m1, test.statistic='F')
+
+```
+
+For every extra day spent in West Africa cuckoos arrive 0.78 days 
+later back at UK breeding grounds.
+
+```{r, warning=F, message=F, echo=F}
+m4<-lmer(arrive_breeding~DEPwestAF+
+           (1|ptt)+(1|year), data=dat)
+
+
+newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
+newdat$p1<-predict(m4, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
+vcv<-vcov(m4)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=DEPwestAF, y=uc), colour='red', linetype='dashed')+
+  xlab("Departure date West Africa (DOY)")+
+  ylab("Arrival at breeding grounds (DOY)")+
+  theme_bw()
+```
+
+There was only very slight support for cuckoos being able to compensate for later departure from West Africa through faster migration.
+*might omit, likely influenced by outliers*
+
+```{r, warning=F, message=F, echo=F}
+d1$migration.length<-d1$arrive.breeding.uk-d1$depart.west.africa
+
+m5<-lmer(migration.length~depart.west.africa+
+           (1|ptt)+(1|year), data=d1)
+
+qplot(data=d1, x=depart.west.africa, y=migration.length)+
+  xlab("Departure date West Africa (DOY)")+
+  ylab("Migration length (days)")+
+  theme_bw()
+
+Anova(m5, test.statistic = 'F')
+```
+
+### Q2)
+
+
+
+```{r, warning=F, message=F, echo=F}
+
+dat$year<-as.character(dat$year)
+
+#reorder breeding location in latitude order
+
+# relevel to central well sampled year
+dat$breeding_loc<-factor(dat$breeding, levels=c('Scotland', 'Lake District', 'North York Moors', 'Sherwood Forest',  'Wales', 'Thetford Forest', 'Norfolk Broads','Ashdown Forest', 'New Forest', 'Dartmoor'))
+
+m1<-lmer(DEPwestAF~year+breeding_loc+year+(1|ptt), data=dat)
+
+library(stargazer)
+
+stargazer(m1, type='text',
+covariate.labels=c("Constant: Scotland, 2012","2013", "2014","2015", "2016", "2017", "2018", 'Lake District', 'North York Moors', 'Sherwood Forest',  'Wales', 'Thetford Forest', 'Norfolk Broads','Ashdown Forest', 'New Forest', 'Dartmoor'),
+dep.var.labels ="West Africa depature date",
+ci=TRUE, intercept.bottom = FALSE, omit.table.layout = "sn", 
+digits=1, model.numbers=FALSE,  report='vcs')
+
 ```
 
 
+```{r, warning=F, message=F, echo=F}
+
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+# summarise data for each stopover so that value per date is the mean
+# of the detail coords values
+
+library(dplyr)
+
+dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
+            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
+            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
+            terrANOM=mean(terrANOM, na.rm=T))
+
+dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
+dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
+
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+
+# rearrange
+
+dat2<- dat2 %>% select(year, ptt, SO_startDOY, SO_endDOY, country, everything())
+
+dat2.1<-subset(dat2, cuck_pres=='Y')
+
+dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
+  summarise(cumrf=mean(cumrf, na.rm=T),
+            NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
+            terrANOM=mean(terrANOM, na.rm=T),
+            SOlen=first(SO_endDOY)-first(SO_startDOY))
+
+dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
+  summarise(cumrf=last(cumrf),
+            NDVI= last(NDVI), 
+            aquaNDVI=last(aquaNDVI),
+            aquaANOM=last(aquaANOM),
+            terrNDVI=last(terrNDVI),
+            terrANOM=last(terrANOM),
+            last_SOstart=last(SO_startDOY))
+
+dat$year<-as.integer(dat$year)
+
+dat3<-full_join(dat, dat2.3, by=c('ptt', 'year'))
+
+m6<-lmer(DEPwestAF~aquaANOM+
+           (1|ptt)+(1|year), data=dat3)
+
+summary(m6)
+
+# plot
+
+newdat<-data.frame(aquaANOM=seq(-0.15,0.15, 0.005), DEPwestAF=1)
+newdat$p1<-predict(m6, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(DEPwestAF~aquaANOM, data=newdat)
+vcv<-vcov(m6)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dat3, x=aquaANOM, y=DEPwestAF)+
+  geom_line(data=newdat, aes(x=aquaANOM, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=aquaANOM, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=aquaANOM, y=uc), colour='red', linetype='dashed')+
+  xlab("NDVI anomoly")+
+  ylab("Departure date West Africa (DOY)")+
+  theme_bw()
+
+
+Anova(m6, test.statistic = 'F')
+
+```
