@@ -281,6 +281,89 @@ which(!is.na(int2$aquaNDVI))
 write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
 
+#################
+# extra code to extract TAMSAT rainfall and anomoly data also and
+# add to existing file
+
+library(raster)
+library(dplyr)
+
+int2<-read.csv('data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+# get coord data
+dat<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords.csv', h=T)
+
+# join lat long
+
+dat$ID=paste(dat$ptt, dat$year, dat$SO_startDOY, dat$timestamp, sep='_')
+
+int2$ID <-as.character(int2$ID)
+
+int2<-left_join(int2, select(dat, ID, long, lat), by='ID')
+
+# rearrange
+int2<- int2 %>% select(ID, ptt, year, SO_startDOY, SO_endDOY, country,
+                       timestamp, long, lat, everything())
+
+int2$tamRAIN<-NA
+
+int2$tamRAINanom<-NA
+
+# set up key to get data
+
+int2$key<-'01-pt1'
+int2[int2$variable %in% 6:10,]$key <-'01-pt2'
+int2[int2$variable %in% 11:15,]$key <-'01-pt3'
+int2[int2$variable %in% 16:20,]$key <-'01-pt4'
+int2[int2$variable %in% 21:25,]$key <-'01-pt5'
+int2[int2$variable %in% 26:30,]$key <-'01-pt6'
+
+int2[int2$variable %in% 31:35,]$key <-'02-pt1'
+int2[int2$variable %in% 36:40,]$key <-'02-pt2'
+int2[int2$variable %in% 41:45,]$key <-'02-pt3'
+int2[int2$variable %in% 46:50,]$key <-'02-pt4'
+int2[int2$variable %in% 51:55,]$key <-'02-pt5'
+int2[int2$variable %in% 56:60,]$key <-'02-pt6'
+
+int2[int2$variable %in% 61:65,]$key <-'03-pt1'
+int2[int2$variable %in% 66:70,]$key <-'03-pt2'
+int2[int2$variable %in% 71:75,]$key <-'03-pt3'
+int2[int2$variable %in% 76:80,]$key <-'03-pt4'
+int2[int2$variable %in% 81:85,]$key <-'03-pt5'
+int2[int2$variable %in% 86:90,]$key <-'03-pt6'
+
+int2[int2$variable %in% 91:95,]$key <-'04-pt1'
+int2[int2$variable %in% 96:100,]$key <-'04-pt2'
+int2[int2$variable %in% 101:105,]$key <-'04-pt3'
+int2[int2$variable %in% 106:110,]$key <-'04-pt4'
+int2[int2$variable %in% 111:115,]$key <-'04-pt5'
+int2[int2$variable %in% 116:120,]$key <-'04-pt6'
+
+int2[int2$variable %in% 121:125,]$key <-'05-pt1'
+
+
+for(i in unique(int2$year))
+{
+  for(j in unique(int2[int2$year==i,]$key))
+  {
+  ras_rf<-raster(paste('C:/cuckoo_tracking/sourced_data/TAMSAT/rainfall/', 
+                       i, '/', substr(j, 1,2), '/rfe',i, '_', j, '.v3.nc',sep=""))  
+  ras_anom<-raster(paste('C:/cuckoo_tracking/sourced_data/TAMSAT/rainfall_anom/', 
+                       i, '/', substr(j, 1,2), '/rfe',i, '_', j, '_anom.v3.nc',sep=""))  
+
+  int2[int2$year==i & int2$key==j,]$tamRAIN<-
+  extract(ras_rf, int2[int2$year==i & int2$key==j,8:9], na.rm=T)  
+  
+  int2[int2$year==i & int2$key==j,]$tamRAINanom<-
+    extract(ras_anom, int2[int2$year==i & int2$key==j,8:9], na.rm=T) 
+  
+  print(paste(i, j))
+  }
+  
+}
+
+write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
+
 
 
 ## OLD
@@ -317,4 +400,6 @@ for( i in 1:nrow(dat))
 # write out
 
 write.csv(int_out2, 'data/spring_rainfall_stopover_comparison.csv', row.names = F, quote=F)
+
+
 
