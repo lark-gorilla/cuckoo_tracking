@@ -14,7 +14,7 @@ output: html_document
     setwd("N:/cuckoo_tracking")}
 
 
-int_out<-read.csv('data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', h=T)
+int_out<-read.csv('data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
 
 dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
@@ -83,6 +83,9 @@ t1.3<-cbind(t1.1, t1.2)
   
 t2<-t1.3 %>% group_by(SO_startDOY, country) %>% dplyr::mutate(cumrf=cumsum(value))
 
+t2.tmcum<- t1.3 %>% group_by(ptt, year, SO_startDOY,country, key) %>% dplyr::summarise(tamRAIN=first(tamRAIN), variable=first(variable)) %>%
+  dplyr::mutate(cumrfTAM=cumsum(tamRAIN))
+
 temp=ggplot(data=t2,aes(x=variable, y=value))+
 geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
     geom_line(data=t2, aes(x=variable, y=value2*500), colour='red')+
@@ -90,9 +93,11 @@ geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
   geom_line(data=t2, aes(x=variable, y=terrNDVI*500), colour='orange')+
     geom_line(data=t2, aes(x=variable, y=aquaANOM*1000+200), colour='cyan', linetype=2)+
     geom_line(data=t2, aes(x=variable, y=terrANOM*1000+200), colour='orange', linetype=2)+
+  geom_line(data=t2, aes(x=variable, y=tamRAINanom+200), colour='dark green', linetype=2)+
   geom_hline(yintercept=200)+
   geom_bar(stat='identity', colour='black')+
     geom_line(aes(y=cumrf), col='green', size=1)+
+  geom_line(data=t2.tmcum, aes(x=variable, y=cumrfTAM), col='dark green', size=1)+
   facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
   ylab('cumulative rainfall since 01 Jan (mm)')+ xlab('Day of year')+
           ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", dtemp$arrive_breeding))+geom_label(data=lc1, aes(x=15, y=450, vjust=1,label=label), fill=NA)
