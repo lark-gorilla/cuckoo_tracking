@@ -9,7 +9,7 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
-```{r, echo=F}
+```{r, echo=F, warning=F, message=F}
 library('lme4')
 library('car')
 library('ggplot2')
@@ -21,6 +21,8 @@ if(Sys.info()['nodename']=="D9L5812"){
 
 dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
 
+#### Data cleaning
+
 # set NA or manually correct cuckoo depature dates that
 # are incorrect, from manual examination
 
@@ -30,6 +32,23 @@ dat[dat$ptt==134956 & dat$year==2015,]$DEPwestAF<-NA
 
 # and dead ones
 dat[dat$ptt==128296 & dat$year==2014,]$DEPwestAF<-NA
+
+## fill NA in mig route
+
+extraz<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv', h=T)
+
+# fills some
+dat<-left_join(dat, select(extraz, ptt, year, autumn_mig), by=c('ptt', 'year'))
+
+# fill 2018 birds
+dat[c(47, 44, 42),]$autumn_mig.y='SW'
+dat[39,]$autumn_mig.y='SE'
+# and dead birds
+dat[c(2,20,45),]$autumn_mig.y='SW'
+dat[c(1,3,23,25,31),]$autumn_mig.y='SE'
+
+names(dat)[names(dat)=='autumn_mig.y']<-'autumn_mig'
+dat$autumn_mig.x<-NULL
 
 ```
 
@@ -61,9 +80,10 @@ ggplot(data=dat, aes(y=arrive_breeding))+
   geom_point(aes(x=DEPcentralAF), col=5, shape=1)+
   geom_point(aes(x=depart_winterSO), col=6, shape=1)+
   xlim(c(-71, 142))+ylab('Arrival at breeding grounds DOY')+
-  xlab('DOY')+theme_classic()
+  xlab('DOY')+theme_bw()
   
 ```
+
 
 Stats confirm that date of departure from West Africa significantly impacts subsequent date of arrival at Uk breeding grounds, but prior stages of spring migration do not.
 
@@ -125,23 +145,70 @@ Anova(m5, test.statistic = 'F')
 
 ### Q2)
 
+## Endogenous factors that influence dpearture date from West Africa.
 
+No convincing evidence that different breeding populations depart West Africa at different times. *slight significance comes from very early New Forest population*
 
 ```{r, warning=F, message=F, echo=F}
 
-dat$year<-as.character(dat$year)
-
 #reorder breeding location in latitude order
-
 # relevel to central well sampled year
 dat$breeding_loc<-factor(dat$breeding, levels=c('Scotland', 'Lake District', 'North York Moors', 'Sherwood Forest',  'Wales', 'Thetford Forest', 'Norfolk Broads','Ashdown Forest', 'New Forest', 'Dartmoor'))
 
-m1<-lmer(DEPwestAF~year+breeding_loc+year+(1|ptt), data=dat)
+m1<-lmer(DEPwestAF~breeding_loc+(1|year)+(1|ptt), data=dat)
+
+Anova(m1, test.statistic = 'F')
+
+qplot(data=dat, x=breeding_loc, y=DEPwestAF)+theme_bw()+theme(axis.text.x=element_text(angle=90))+xlab("Breeding location")+ylab("Departure date West Africa (DOY)")+geom_label(data=data.frame(), aes(label = 'Anova F=4.55, p=0.023', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+```
+
+No evidence that different autumn migration routes impact timing of spring departure from West Africa.
+
+```{r, warning=F, message=F, echo=F}
+# and for migratory route
+m1<-lmer(DEPwestAF~autumn_mig+(1|year)+(1|ptt), data=dat)
+
+Anova(m1, test.statistic = 'F')
+
+qplot(data=dat, x=autumn_mig, y=DEPwestAF, geom='boxplot')+xlab("Autumn migratory route")+ylab("Departure date West Africa (DOY)")+geom_label(data=data.frame(), aes(label = 'Anova F=0.81, p=0.373', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+```
+
+For birds that were tracked through multiple spring migrations there are inter-bird differences in West African departure date and varying degrees of
+inter-annual variation within birds.
+
+```{r, warning=F, message=F, echo=F}
+multi_yr<-names(which(table(dat$ptt)>1))
+
+multi_yr<-multi_yr[multi_yr!=128300]
+
+m1<-lmer(DEPwestAF~factor(ptt)+(1|year), data=dat[dat$ptt %in% multi_yr ,])
+
+Anova(m1, test.statistic = 'F')
+
+ggplot(data=dat[dat$ptt %in% multi_yr ,], aes(x=factor(ptt), y=DEPwestAF ))+xlab("Bird ID")+ylab("Departure date West Africa (DOY)")+geom_jitter(width=0.08,shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=4.13, p=0.017', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+
+```
+
+
+## Environmental factors that influence departure date from West Africa.
+
+First, there appears no overall difference between years in departure date from West Africa (median: 102 DOY). *This might support internal regulation for timing of migration out of West Africa by birds e.g. photoperiod (endogenous) but could be an artefact of sample size - more tracking would reveal statistically significant differences between years?*
+
+
+```{r, warning=F, message=F, echo=F}
+dat$year<-as.character(dat$year)
+
+m1<-lmer(DEPwestAF~year+(1|ptt), data=dat)
+
+Anova(m1, test.statistic = 'F')
+
+ggplot(data=dat, aes(x=year, y=DEPwestAF ))+xlab("Year")+ylab("Departure date West Africa (DOY)")+geom_jitter(width=0.08,shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=1.27, p=0.315', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+
 
 library(stargazer)
 
 stargazer(m1, type='text',
-covariate.labels=c("Constant: Scotland, 2012","2013", "2014","2015", "2016", "2017", "2018", 'Lake District', 'North York Moors', 'Sherwood Forest',  'Wales', 'Thetford Forest', 'Norfolk Broads','Ashdown Forest', 'New Forest', 'Dartmoor'),
+covariate.labels=c("Constant: 2012","2013", "2014","2015", "2016", "2017", "2018"),
 dep.var.labels ="West Africa depature date",
 ci=TRUE, intercept.bottom = FALSE, omit.table.layout = "sn", 
 digits=1, model.numbers=FALSE,  report='vcs')
@@ -151,7 +218,7 @@ digits=1, model.numbers=FALSE,  report='vcs')
 
 ```{r, warning=F, message=F, echo=F}
 
-env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_by_stopover_detailcoords_2018_dead.csv', h=T)
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
 
 # summarise data for each stopover so that value per date is the mean
 # of the detail coords values
@@ -162,8 +229,7 @@ dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
   summarise(country=last(country), SO_endDOY=first(SO_endDOY),
             cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
             NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
-            terrANOM=mean(terrANOM, na.rm=T))
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
 
 dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
 dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
@@ -180,9 +246,7 @@ dat2.1<-subset(dat2, cuck_pres=='Y')
 dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
   summarise(cumrf=mean(cumrf, na.rm=T),
             NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),
-            terrANOM=mean(terrANOM, na.rm=T),
-            SOlen=first(SO_endDOY)-first(SO_startDOY))
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),terrANOM=mean(terrANOM, na.rm=T),tamRAIN=mean(tamRAIN, na.rm=T),tamRAINanom=mean(tamRAINanom, na.rm=T), SOlen=first(SO_endDOY)-first(SO_startDOY))
 
 dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
   summarise(cumrf=last(cumrf),
@@ -191,6 +255,8 @@ dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
             aquaANOM=last(aquaANOM),
             terrNDVI=last(terrNDVI),
             terrANOM=last(terrANOM),
+             tamRAIN=last(tamRAIN),
+            tamRAINanom=last(tamRAINanom),
             last_SOstart=last(SO_startDOY))
 
 dat$year<-as.integer(dat$year)
