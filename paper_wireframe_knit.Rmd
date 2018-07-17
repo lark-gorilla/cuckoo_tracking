@@ -13,13 +13,21 @@ knitr::opts_chunk$set(echo = TRUE)
 library('lme4')
 library('car')
 library('ggplot2')
+library('dplyr')
+library('maps')
+library('stargazer')
 
 
 if(Sys.info()['nodename']=="D9L5812"){
   setwd("C:/cuckoo_tracking")}else{
     setwd("N:/cuckoo_tracking")}
 
+#summary data
 dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
+
+#stopover coord data (median points)
+sovers<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv', h=T)
+
 
 #### Data cleaning
 
@@ -173,8 +181,7 @@ Anova(m1, test.statistic = 'F')
 qplot(data=dat, x=autumn_mig, y=DEPwestAF, geom='boxplot')+xlab("Autumn migratory route")+ylab("Departure date West Africa (DOY)")+geom_label(data=data.frame(), aes(label = 'Anova F=0.81, p=0.373', x = -Inf, y = Inf), hjust = 0, vjust = 1)
 ```
 
-For birds that were tracked through multiple spring migrations there are inter-bird differences in West African departure date and varying degrees of
-inter-annual variation within birds.
+For birds that were tracked through multiple spring migrations there are inter-bird differences in West African departure date and differing levels of inter-annual variation within birds.
 
 ```{r, warning=F, message=F, echo=F}
 multi_yr<-names(which(table(dat$ptt)>1))
@@ -189,6 +196,29 @@ ggplot(data=dat[dat$ptt %in% multi_yr ,], aes(x=factor(ptt), y=DEPwestAF ))+xlab
 
 ```
 
+Differing levels of intra-bird variation were also evident in final stopover location before departure from West Africa
+
+```{r, warning=F, message=F, echo=F}
+
+multi_yr_SO<-sovers[sovers$ptt %in% multi_yr,]
+
+notWA<-c('Italy', 'France', 'Spain', 'Algeria',
+        'United Kingdom', 'Morocco')
+
+multi_yr_SO<-multi_yr_SO[-which(multi_yr_SO$country %in% notWA),]
+
+lastWASO<-multi_yr_SO %>% group_by(ptt, year) %>% summarise(long=last(SO_median_long), lat=last(SO_median_lat), country=last(country))
+
+map = map_data("world")
+map = subset(map, region=='Africa')
+
+ggplot() + geom_polygon(data = map,
+               aes(x=long, y = lat, group = group),
+               fill = NA, colour="darkgray", size=0.5)+
+  geom_point(data=lastWASO, aes(x=long, y=lat, colour=factor(ptt)), shape=1, size=2)+
+  geom_line(data=lastWASO, aes(x=long, y=lat, colour=factor(ptt)), alpha=0.2)+coord_cartesian()+
+   coord_map(xlim = c(-16, 5),ylim = c(14, 3))+xlab('Longitude')+ylab('Latitude')+theme_bw()+ labs(colour = "Bird ID")
+```
 
 ## Environmental factors that influence departure date from West Africa.
 
@@ -203,9 +233,6 @@ m1<-lmer(DEPwestAF~year+(1|ptt), data=dat)
 Anova(m1, test.statistic = 'F')
 
 ggplot(data=dat, aes(x=year, y=DEPwestAF ))+xlab("Year")+ylab("Departure date West Africa (DOY)")+geom_jitter(width=0.08,shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=1.27, p=0.315', x = -Inf, y = Inf), hjust = 0, vjust = 1)
-
-
-library(stargazer)
 
 stargazer(m1, type='text',
 covariate.labels=c("Constant: 2012","2013", "2014","2015", "2016", "2017", "2018"),
@@ -222,8 +249,6 @@ env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_sto
 
 # summarise data for each stopover so that value per date is the mean
 # of the detail coords values
-
-library(dplyr)
 
 dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
   summarise(country=last(country), SO_endDOY=first(SO_endDOY),
