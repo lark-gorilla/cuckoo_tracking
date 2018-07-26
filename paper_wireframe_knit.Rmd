@@ -96,6 +96,34 @@ lc1<-left_join(lc1, select(soversWA, ptt, year, SO_startDOY, SO_days), by=c('ptt
 ## join landcover of final stopover to dat
 dat<-left_join(dat, (lc1 %>% group_by(ptt, year) %>% dplyr::summarise_all(last)), by=c('ptt', 'year'))
 
+#### AND THE ENV DATA #####
+
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+# summarise data for each stopover so that value per date is the mean
+# of the detail coords values
+
+dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
+            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
+            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
+
+dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
+dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
+
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+# rearrange
+
+dat2<- dat2 %>% select(year, ptt, SO_startDOY, SO_endDOY, country, everything())
+
+dat2.1<-subset(dat2, cuck_pres=='Y')
+
+dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
+  summarise(cumrf=mean(cumrf, na.rm=T),
+            NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),terrANOM=mean(terrANOM, na.rm=T),tamRAIN=mean(tamRAIN, na.rm=T),tamRAINanom=mean(tamRAINanom, na.rm=T), SOlen=first(SO_endDOY)-first(SO_startDOY))
 
 
 
@@ -352,6 +380,44 @@ m1<-lmer(DEPwestAF~breeding_loc+(1|year)+(1|ptt), data=dat)
 ggplot(data=dtemp, aes(x=dep_country, y=DEPwestAF ))+xlab("Departure country")+ylab("Departure date West Africa (DOY)")+geom_jitter(width=0.1,shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=0.552, p=0.735', x = -Inf, y = Inf), hjust = 0, vjust = 1)+theme(axis.text.x=element_text(angle=90))
 ```
 
+So what do these early leaving birds do in their runup to departing Cote d'Ivoire that is different to other birds?
+
+```{r, warning=F, message=F, echo=F} 
+
+soversWA1<-left_join(soversWA, dat[,c(1,2,6)], by=c('ptt', 'year'))
+
+soversWA2<-left_join(soversWA1, dat2.2[,c(1,2, 3,7)], by=c('ptt', 'year', 'SO_startDOY'))
+
+forsp<-na.omit(soversWA2[,c(1,2,7,8,9,17,18,22,23)])
+
+forsp<-forsp %>% group_by(ptt, year) %>% mutate(nzz=n()) %>% filter(nzz>1) # drops Peckham in 2016 that cocks up linestring
+
+dat_sp<-st_as_sf(forsp, coords = c("SO_median_long","SO_median_lat"), crs="+proj=longlat +datum=WGS84")
+
+dat_ls<-dat_sp %>% group_by(ptt, year, DEPwestAF) %>% summarise(do_union=F) %>% st_cast("LINESTRING")
+
+dat_ls
+
+d2<-dat_sp[dat_sp$DEPwestAF<101,]
+d3<-dat_sp[dat_sp$DEPwestAF>100,]
+
+m <- leaflet() %>%
+  addTiles() %>% 
+  
+  addPolylines(data=dat_ls[dat_ls$DEPwestAF<101,], weight=1, color='blue', group='Early departure') %>%
+  
+    addPolylines(data=dat_ls[dat_ls$DEPwestAF>100,], weight=1, color='orange', group='Late departure') %>%
+  
+  addCircleMarkers(data=d2, popup= paste("ptt:", d2$ptt, "<br>", "year:", d2$year,"<br>", "NDVIanom:", d2$aquaANOM), color=~ifelse(aquaANOM>0, 'green', 'red'), stroke=F, radius=5, group='Early departure') %>%
+  
+    addCircleMarkers(data=d3, popup= paste("ptt:", d3$ptt, "<br>", "year:", d3$year,"<br>", "NDVIanom:", d3$aquaANOM), color=~ifelse(aquaANOM>0, 'green', 'red'), stroke=F, radius=5, group='Late departure') %>%
+  
+  addLayersControl(overlayGroups = c('Early departure', 'Late departure'), options=layersControlOptions(collapsed=F))
+   
+m           
+
+``` 
+
 
 ## Habitat Variables
 
@@ -421,33 +487,6 @@ NDVI anomoly appears important. Greener final stopover sites allow earlier depar
 
 ```{r, warning=F, message=F, echo=F}
 
-env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
-
-# summarise data for each stopover so that value per date is the mean
-# of the detail coords values
-
-dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
-  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
-            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
-            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
-
-dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
-dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
-
-dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
-
-
-# rearrange
-
-dat2<- dat2 %>% select(year, ptt, SO_startDOY, SO_endDOY, country, everything())
-
-dat2.1<-subset(dat2, cuck_pres=='Y')
-
-dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
-  summarise(cumrf=mean(cumrf, na.rm=T),
-            NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),terrANOM=mean(terrANOM, na.rm=T),tamRAIN=mean(tamRAIN, na.rm=T),tamRAINanom=mean(tamRAINanom, na.rm=T), SOlen=first(SO_endDOY)-first(SO_startDOY))
 
 dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
   summarise(cumrf=last(cumrf),
@@ -522,7 +561,7 @@ ggplot()+geom_line(data=dat2[dat2$cumrf>0,],aes(x=variable, y=cumrf, group=paste
 
 ```
 
-Shown with mean rainfall per country (blue line) and mean arrival date for first stopovers in West Africa (red line), we can see rains arrive at generally the same time across  in Cote d'Ivoire than in Ghana and so are cuckoos?
+Shown with mean rainfall per country (blue line) and mean arrival date for first stopovers in West Africa (red line), we can see rains arrive at generally the same time across in Cote d'Ivoire than in Ghana and so are cuckoos?
 
 ```{r, warning=F, message=F, echo=F}
 
@@ -553,51 +592,6 @@ grid.arrange(p1, p2, ncol=2)
 
 ```
 
-
-Compare this to when cuckoos leave their last stopover in central Africa
-
-```{r, warning=F, message=F, echo=F}
-
-dat3<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
-  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
-            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
-            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
-
-
-dat3[which(dat3$precip>500),]$precip<-0 # remove erroneous vals
-dat3[which(is.na(dat3$precip)),]$precip<-0 # fix na
-
-dat3<-dat3 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
-
-dat3<- dat3[which(dat3$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon')),] 
-
-temp<-dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last) %>% group_by(country) %>% summarise(MSO_endDOY=mean(SO_endDOY), Mrf=mean(cumrf), Mnd=mean(aquaNDVI, na.rm=T))
-
-
-temp2<-dat3 %>% group_by(country, variable) %>% summarise(Mcumrf=mean(cumrf), rfmin=mean(cumrf)-sd(cumrf), rfmax=mean(cumrf)+sd(cumrf),                                                          MaquaNDVI=mean(aquaNDVI, na.rm=T), ndmin=(mean(aquaNDVI, na.rm=T)-sd(aquaNDVI, na.rm=T)), ndmax=(mean(aquaNDVI, na.rm=T)+sd(aquaNDVI, na.rm=T)))
-
-
-p1<-ggplot()+
-geom_line(data=temp2,aes(x=variable, y=Mcumrf), size=1, colour='blue')+
-geom_line(data=temp2,aes(x=variable, y=rfmin), colour='grey', linetype=2)+
-geom_line(data=temp2,aes(x=variable, y=rfmax), colour='grey', linetype=2)+  
-geom_vline(data=(dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last)), aes(xintercept = SO_endDOY), colour='black', alpha=0.5)+
-geom_vline(data=temp, aes(xintercept = MSO_endDOY), colour='red', size=1.5)+
-   facet_grid(country~.)+xlab("Day of year")+
-  ylab("Cumulative rainfall (mm)")+theme_bw()
-
-p2<-ggplot()+geom_line(data=temp2,aes(x=variable, y=MaquaNDVI), size=1, colour='dark green')+
-geom_line(data=temp2,aes(x=variable, y=ndmin), colour='orange', linetype=2)+
-geom_line(data=temp2,aes(x=variable, y=ndmax), colour='orange', linetype=2)+
-geom_vline(data=(dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last)), aes(xintercept = SO_endDOY), colour='black', alpha=0.5)+
-geom_vline(data=temp, aes(xintercept = MSO_endDOY), colour='red', size=1.5)+
-   facet_grid(country~.)+xlab("Day of year")+
-  ylab("NDVI")+theme_bw()
-
-grid.arrange(p1, p2, ncol=2)
-
-```
 
 The first stopover in West Africa is timed to catch rains
 
