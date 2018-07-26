@@ -19,6 +19,7 @@ library('stargazer')
 library('splines')
 library('sf')
 library('leaflet')
+library('gridExtra')
 
 
 if(Sys.info()['nodename']=="D9L5812"){
@@ -493,7 +494,7 @@ qplot(data=dat3, x=aquaANOM, y=DEPwestAF)+
 ```
 
 
-Drought-breaking rains do not limit departure date specifically, however they do limit arrival into West Africa from Central Africa. Birds do not move into West Africa until rains have arrived.Blue blur is rainfall for each stopover Red line is arrival of cuckoo.
+Drought-breaking rains do not limit departure date specifically, however they do limit arrival into West Africa from Central Africa. Birds do not move into West Africa until rains have arrived. Blue blur is rainfall for each stopover, black line is first arrival of cuckoo and red lines are subsequent stopovers.
 
 ```{r, warning=F, message=F, echo=F}
 
@@ -515,8 +516,86 @@ dat2<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Co
 # relevel to central well sampled year
 dat2$country<-factor(dat2$country, levels=c('Nigeria', 'Togo', 'Ghana', "Cote d'Ivoire", 'Guinea', 'Sierra Leone'))
 
-ggplot()+geom_line(data=dat2[dat2$cumrf>0,],aes(x=variable, y=cumrf, group=paste(ptt, year,SO_startDOY)), size=2, alpha=0.08, colour='blue')+theme_bw()+geom_vline(data=(dat2 %>% group_by(ptt, year, SO_startDOY) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='red', alpha=0.5)+facet_wrap(~country)+xlab("Day of year")+
+ggplot()+geom_line(data=dat2[dat2$cumrf>0,],aes(x=variable, y=cumrf, group=paste(ptt, year,SO_startDOY)), size=2, alpha=0.08, colour='blue')+theme_bw()+geom_vline(data=(dat2 %>% group_by(ptt, year, SO_startDOY) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='red', alpha=0.5)+
+  geom_vline(data=(dat2[dat2$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+facet_wrap(~country)+xlab("Day of year")+
   ylab("Cumulative rainfall (mm)")
+
+```
+
+Shown with mean rainfall per country (blue line) and mean arrival date for first stopovers in West Africa (red line), we can see rains arrive at generally the same time across  in Cote d'Ivoire than in Ghana and so are cuckoos?
+
+```{r, warning=F, message=F, echo=F}
+
+temp<-dat2[dat2$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(first) %>% group_by(country) %>% summarise(MSO_startDOY=mean(SO_startDOY), Mrf=mean(cumrf), Mnd=mean(aquaNDVI))
+
+
+temp2<-dat2 %>% group_by(country, variable) %>% summarise(Mcumrf=mean(cumrf), rfmin=mean(cumrf)-sd(cumrf), rfmax=mean(cumrf)+sd(cumrf),                                                          MaquaNDVI=mean(aquaNDVI, na.rm=T), ndmin=(mean(aquaNDVI, na.rm=T)-sd(aquaNDVI, na.rm=T)), ndmax=(mean(aquaNDVI, na.rm=T)+sd(aquaNDVI, na.rm=T)))
+
+
+p1<-ggplot()+
+geom_line(data=temp2,aes(x=variable, y=Mcumrf), size=1, colour='blue')+
+geom_line(data=temp2,aes(x=variable, y=rfmin), colour='grey', linetype=2)+
+geom_line(data=temp2,aes(x=variable, y=rfmax), colour='grey', linetype=2)+  
+geom_vline(data=(dat2[dat2$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp, aes(xintercept = MSO_startDOY), colour='red', size=1.5)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("Cumulative rainfall (mm)")+theme_bw()
+
+p2<-ggplot()+geom_line(data=temp2,aes(x=variable, y=MaquaNDVI), size=1, colour='dark green')+
+geom_line(data=temp2,aes(x=variable, y=ndmin), colour='orange', linetype=2)+
+geom_line(data=temp2,aes(x=variable, y=ndmax), colour='orange', linetype=2)+
+geom_vline(data=(dat2[dat2$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp, aes(xintercept = MSO_startDOY), colour='red', size=1.5)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("NDVI")+theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+
+Compare this to when cuckoos leave their last stopover in central Africa
+
+```{r, warning=F, message=F, echo=F}
+
+dat3<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
+            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
+            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
+            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
+
+
+dat3[which(dat3$precip>500),]$precip<-0 # remove erroneous vals
+dat3[which(is.na(dat3$precip)),]$precip<-0 # fix na
+
+dat3<-dat3 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+dat3<- dat3[which(dat3$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon')),] 
+
+temp<-dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last) %>% group_by(country) %>% summarise(MSO_endDOY=mean(SO_endDOY), Mrf=mean(cumrf), Mnd=mean(aquaNDVI, na.rm=T))
+
+
+temp2<-dat3 %>% group_by(country, variable) %>% summarise(Mcumrf=mean(cumrf), rfmin=mean(cumrf)-sd(cumrf), rfmax=mean(cumrf)+sd(cumrf),                                                          MaquaNDVI=mean(aquaNDVI, na.rm=T), ndmin=(mean(aquaNDVI, na.rm=T)-sd(aquaNDVI, na.rm=T)), ndmax=(mean(aquaNDVI, na.rm=T)+sd(aquaNDVI, na.rm=T)))
+
+
+p1<-ggplot()+
+geom_line(data=temp2,aes(x=variable, y=Mcumrf), size=1, colour='blue')+
+geom_line(data=temp2,aes(x=variable, y=rfmin), colour='grey', linetype=2)+
+geom_line(data=temp2,aes(x=variable, y=rfmax), colour='grey', linetype=2)+  
+geom_vline(data=(dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last)), aes(xintercept = SO_endDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp, aes(xintercept = MSO_endDOY), colour='red', size=1.5)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("Cumulative rainfall (mm)")+theme_bw()
+
+p2<-ggplot()+geom_line(data=temp2,aes(x=variable, y=MaquaNDVI), size=1, colour='dark green')+
+geom_line(data=temp2,aes(x=variable, y=ndmin), colour='orange', linetype=2)+
+geom_line(data=temp2,aes(x=variable, y=ndmax), colour='orange', linetype=2)+
+geom_vline(data=(dat3[dat3$cuck_pres=='Y',] %>% group_by(ptt, year) %>% summarise_all(last)), aes(xintercept = SO_endDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp, aes(xintercept = MSO_endDOY), colour='red', size=1.5)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("NDVI")+theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
 
 ```
 
