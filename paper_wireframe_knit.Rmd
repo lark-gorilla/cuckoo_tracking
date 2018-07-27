@@ -98,34 +98,33 @@ dat<-left_join(dat, (lc1 %>% group_by(ptt, year) %>% dplyr::summarise_all(last))
 
 #### AND THE ENV DATA #####
 
-env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+names(env)[names(env)=='value']<-'precip'
+names(env)[names(env)=='value2']<-'ndvi'
+env$cuck_pres<-as.numeric(env$cuck_pres) # abs=1, pres=2
 
 # summarise data for each stopover so that value per date is the mean
 # of the detail coords values
 
-dat2<- env %>% group_by(year, ptt, SO_startDOY, variable) %>%
-  summarise(country=last(country), SO_endDOY=first(SO_endDOY),
-            cuck_pres=first(cuck_pres), precip=mean(value, na.rm=T),
-            NDVI= mean(value2, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T), terrANOM=mean(terrANOM, na.rm=T), tamRAIN=mean(tamRAIN, na.rm=T), tamRAINanom=mean(tamRAINanom, na.rm=T) )
+dat2<- env[,c(2,3,4,10:22)] %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise_all(mean,na.rm=T)
 
 dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
 dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
 
 dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
 
-# rearrange
+# for tamsat cumrf
+dat2<-dplyr::arrange(dat2, ptt, year, SO_startDOY, variable)
+dat2$tamRAIN[which(!(1:21375 %in% seq(5,21375, 5)))]<-0
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
 
-dat2<- dat2 %>% select(year, ptt, SO_startDOY, SO_endDOY, country, everything())
-
-dat2.1<-subset(dat2, cuck_pres=='Y')
+# select cond during SO..and befoe??
+dat2.1<-subset(dat2, cuck_pres==2)
 
 dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
-  summarise(cumrf=mean(cumrf, na.rm=T),
-            NDVI= mean(NDVI, na.rm=T), aquaNDVI=mean(aquaNDVI, na.rm=T),
-            aquaANOM=mean(aquaANOM, na.rm=T),terrNDVI=mean(terrNDVI, na.rm=T),terrANOM=mean(terrANOM, na.rm=T),tamRAIN=mean(tamRAIN, na.rm=T),tamRAINanom=mean(tamRAINanom, na.rm=T), SOlen=first(SO_endDOY)-first(SO_startDOY))
-
-
+  summarise_all(mean, na.rm=T)
 
 ```
 
@@ -398,6 +397,8 @@ dat_ls<-dat_sp %>% group_by(ptt, year, DEPwestAF) %>% summarise(do_union=F) %>% 
 
 dat_ls
 
+#setwd('C:/cuckoo_tracking/data/spatial');st_write(dat_ls,'spring_linesWA.shp')
+
 d2<-dat_sp[dat_sp$DEPwestAF<101,]
 d3<-dat_sp[dat_sp$DEPwestAF>100,]
 
@@ -489,15 +490,7 @@ NDVI anomoly appears important. Greener final stopover sites allow earlier depar
 
 
 dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
-  summarise(cumrf=last(cumrf),
-            NDVI= last(NDVI), 
-            aquaNDVI=last(aquaNDVI),
-            aquaANOM=last(aquaANOM),
-            terrNDVI=last(terrNDVI),
-            terrANOM=last(terrANOM),
-             tamRAIN=last(tamRAIN),
-            tamRAINanom=last(tamRAINanom),
-            last_SOstart=last(SO_startDOY))
+  summarise_all(last)
 
 dat$year<-as.integer(dat$year)
 
