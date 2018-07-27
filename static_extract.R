@@ -114,3 +114,50 @@ dat$d_river_str2<-apply(rivers2, 2, min)
 
 write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", quote=F, row.names=F)
 
+### code to attribute stopover bestofday locations with env data and depature form 
+### West Africa details for vis in GIS
+
+library(dplyr)
+
+soversWA<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", h=T)
+
+dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
+
+# set NA or manually correct cuckoo depature dates that
+# are incorrect, from manual examination
+
+dat[dat$ptt==115586 & dat$year==2014,]$DEPwestAF<-106
+dat[dat$ptt==134955 & dat$year==2015,]$DEPwestAF<-NA
+dat[dat$ptt==134956 & dat$year==2015,]$DEPwestAF<-NA
+
+# and dead ones
+dat[dat$ptt==128296 & dat$year==2014,]$DEPwestAF<-NA
+
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+names(env)[names(env)=='value']<-'precip'
+names(env)[names(env)=='value2']<-'ndvi'
+
+soversWA1<-left_join(soversWA, dat[,c(1,2,6)], by=c('ptt', 'year'))
+
+soversWA1[,25:31]<-round(soversWA1[,25:31]/rowSums(soversWA1[,25:31], na.rm=T) *100)                      
+
+env[which(env$precip>500),]$precip<-0 # remove erroneous vals
+env[which(is.na(env$precip)),]$precip<-0 # fix na
+
+dat2<-env %>% group_by(year, ptt, timestamp) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+dat2<-dplyr::arrange(dat2, ptt, year, timestamp, variable)
+dat2$tamRAIN[which(!(1:118625 %in% seq(5,118625, 5)))]<-0
+dat2<-dat2 %>% group_by(year, ptt, timestamp) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
+
+dat2.1<-subset(dat2, cuck_pres=='Y')
+
+dat2.2<- dat2.1 %>% group_by(year, ptt, timestamp) %>%
+  summarise_all(mean, na.rm=T) # warnings cos of factors
+
+soversWA2<-left_join(soversWA1, dat2.2[,c(1,2,3,14:24)], by=c('ptt', 'year', 'timestamp'))
+
+write.csv(soversWA2, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers_precip_ndvi.csv", quote=F, row.names=F)
+
+
