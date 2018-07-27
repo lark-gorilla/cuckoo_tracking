@@ -364,7 +364,68 @@ for(i in unique(int2$year))
 
 write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
 
+#### Code to extract NDVI and NDVI anomoly from 250m res data
+# https://earlywarning.usgs.gov/fews/search/Africa
 
+int2<-read.csv('data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+# join lat long
+
+int2$emodisNDVI<-NA
+
+int2$emodisANOM<-NA
+
+# set up key to get data
+
+int2$key<-'01'
+int2[int2$variable %in% 11:20,]$key <-'02'
+int2[int2$variable %in% 21:30,]$key <-'03'
+int2[int2$variable %in% 31:40,]$key <-'04'
+int2[int2$variable %in% 41:50,]$key <-'05'
+int2[int2$variable %in% 51:60,]$key <-'06'
+int2[int2$variable %in% 61:70,]$key <-'07'
+int2[int2$variable %in% 71:80,]$key <-'08'
+int2[int2$variable %in% 81:90,]$key <-'09'
+int2[int2$variable %in% 91:100,]$key <-'10'
+int2[int2$variable %in% 101:110,]$key <-'11'
+int2[int2$variable %in% 111:120,]$key <-'12'
+int2[int2$variable %in% 121:130,]$key <-'13'
+
+
+for(i in unique(int2$year))
+{
+  for(j in unique(int2[int2$year==i,]$key))
+  {
+    ras_ndvi<-raster(paste('F:/NDVIsmooth/wa', 
+                         substr(i, 3,4), j,'.tif',sep=""))  
+    
+    ras_anom<-raster(paste('F:/NDVIanom/wa', 
+                           substr(i, 3,4), j,'stmdn.tif',sep=""))
+    
+    int2[int2$year==i & int2$key==j,]$emodisNDVI<-
+      extract(ras_ndvi, int2[int2$year==i & int2$key==j,8:9], na.rm=T,
+              buffer=1000, fun=function(x){mean(x[x<201], na.rm=T)}) # 1 km buffer cos rater is 250m= v fine res  
+    
+    int2[int2$year==i & int2$key==j,]$emodisanom<-
+      extract(ras_anom, int2[int2$year==i & int2$key==j,8:9], na.rm=T,
+              buffer=1000, fun=function(x){mean(x[x<201], na.rm=T)}) # 1 km buffer cos rater is 250m= v fine res) 
+    
+    print(paste(i, j))
+  }
+  
+}
+
+# rescale bit data 0:200 (201:250 removed in extract function as erroneous )
+# base on guidance from https://earlywarning.usgs.gov/fews/product/451
+
+
+int2$emodisNDVI<-(int2$emodisNDVI* 2/200)-1
+  
+int2$emodisANOM<-(int2$emodisANOM* 0.6/200)-0.3
+
+write.csv(int2, 'data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', row.names = F, quote=F)
+
+###
 
 ## OLD
 
@@ -396,6 +457,7 @@ for( i in 1:nrow(dat))
   
   int_out2<-rbind(int_out2, out)
 }
+
 
 # write out
 
