@@ -283,3 +283,33 @@ write.csv(out, 'C:/cuckoo_tracking/data/GRIMMS_0.25deg_NDVI_climatology.csv', qu
 # reduce size
 
 
+## code to grab modis ndvi anomaly data
+
+for(i in c(1201:1214, 1301:1314, 1401:1414, 1501:1514,
+           1601:1614, 1701:1714, 1801:1813))
+{
+  download.file(url=paste0('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/fews/web/africa/west/dekadal/emodis/ndvi_c6/mediananomaly/downloads/dekadal/wa',
+                           i,'stmdn.zip'),
+                destfile = paste0('F:/NDVIanom/ndvianom', i, '.zip'))
+  
+  download.file(url=paste0('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/fews/web/africa/west/dekadal/emodis/ndvi_c6/temporallysmoothedndvi/downloads/dekadal/wa',
+                           i,'.zip'),
+                destfile = paste0('F:/NDVIsmooth/ndvismooth', i, '.zip'))
+}
+
+
+# to grab rfe rainfall and long term mean data
+
+expg<-expand.grid(1801:1805, 1:3)
+idz<-paste0(expg[,1], expg[,2])
+for(j in idz)
+{
+  download.file(url=paste0('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/fews/web/africa/west/dekadal/rfe/dekadrainfall/downloads/dekadal/w',
+                           j,'rb.zip'),
+                destfile = paste0('F:/RFErainfall/RFE', j, '.zip'))
+  
+  download.file(url=paste0('https://edcintl.cr.usgs.gov/downloads/sciweb1/shared/fews/web/africa/west/dekadal/rfe/longtermanom/downloads/dekadal/wlm',
+                           substr(j, 3,5),'rb.zip'),
+                destfile = paste0('F:/RFEltm/RFEltm', substr(j, 3,5), '.zip'))
+  
+}
