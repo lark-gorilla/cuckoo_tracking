@@ -185,39 +185,26 @@ dat2.4<-dat2.1 %>% group_by(year, ptt) %>%
 
 dat2.5<-dat2.1 %>% 
   group_by(year, ptt) %>%
-  summarise_if(is.numeric, c('mean', 'var'))
+  summarise_if(is.numeric, c('mean', 'sd'))
 
 
 dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3<-left(dat, dat2.4, by=c('ptt', 'year'))
+dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:25)], by=c('ptt', 'year'))
+
+names(dat3)[33:41]<-paste(names(dat3)[33:41],'last', sep='_')
+
+dat4<-left_join(dat3, dat2.5[,c(1,2,16:24, 38:46)], by=c('ptt', 'year'))
 
 
-## check each stopover in West Africa
+## now ready to model!
 
-soversWAenv<-left_join(soversWA, dat2.2, by=c('ptt', 'year', 'SO_startDOY'))
+# do ggally pairs 
+# before check with plots how variables behave
+# also join in habitat 
 
-ggplot(data=soversWAenv, aes(x=SO_days, y=aquaNDVI))+geom_point(shape=1)+theme_bw()
-
-## nothing much
-
-## check start and end stopover conditions ##
-
-dat_st<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
-  summarise_all(first)
-
-dat_ed<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
-  summarise_all(last)
-
-qplot(x=dat_st$cumrf, y=dat_ed$cumrf)
-
-qplot(x=dat_st[dat_st$country=="Cote d'Ivoire" | dat_st$country=="Ghana",]$cumrf,
-      y=dat_ed[dat_ed$country=="Cote d'Ivoire" | dat_ed$country=="Ghana",]$cumrf)
-
-
-ggplot(data=dat3, aes(x=dur_finalSO, y=DEPwestAF, colour=dep_country))+geom_point(shape=1)
 
 # Loop to identify and add start of rains and greening to stopover table
 # remember this will calc for all stopovers in WA, not just the subsample
