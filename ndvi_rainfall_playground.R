@@ -14,8 +14,10 @@ if(Sys.info()['nodename']=="D9L5812"){
 #summary data
 dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
 
-#stopover coord data (median points)
-sovers<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv', h=T)
+#stopover coord data (median points) - with ndvi and env data (only WA!!)
+soversWA<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv', h=T)
+
+so2<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers_precip_ndvi.csv', h=T)
 
 #extra data for filling migratory route
 
@@ -49,11 +51,6 @@ dat$autumn_mig.x<-NULL
 
 ### Add departure info from WA e.g. country, lat and long, length of final stopover and 2nd before last
 
-notWA<-c('Italy', 'France', 'Spain', 'Algeria',
-         'United Kingdom', 'Morocco', 'Portugal')
-
-soversWA<-sovers[-which(sovers$country %in% notWA),]
-
 dat<-left_join(dat, soversWA %>% group_by(ptt, year) %>%
                  summarise( dep_country=last(country),
                             dep_long=last(SO_median_long),
@@ -64,11 +61,14 @@ dat<-left_join(dat, soversWA %>% group_by(ptt, year) %>%
 # add departure ground info
 dat<-left_join(dat, soversWA %>%
                  filter(country %in% c("Ghana","Cote d'Ivoire",
-                                       "Guinea", "Sierra Leone")) %>%
+                                       "Guinea", "Sierra Leone",
+                                       ' Burkina Faso', 'Nigeria')) %>%
                  group_by(ptt, year) %>%
                  summarise(firstCdepartureG=first(country),
                            departureGarr=first(SO_startDOY),
-                           nSOdepartureG=n()),
+                           nSOdepartureG=n(),
+                            rainarrDOY=first(rainarrDOY),
+                            ndviupDOY=first(ndviupDOY)),
                by=c('ptt', 'year'))
 
 
@@ -101,12 +101,17 @@ ggplot(data=dat, aes(x=nSOdepartureG, y=DEPwestAF))+geom_jitter(width=0.2, shape
 ggplot(data=dat, aes(x=nSOdepartureG, y=DEPwestAF, colour=DEPwestAF-departureGarr))+geom_point()+
   scale_colour_gradientn(colours=terrain.colors(10))
 
-
+# !!!!! TO REMEBER FOR MODELLING !!!!! #
 # !!!!!!!! remember outliers DEPestAF <85 and > 120
+# 3 depatures from Nigeria and Burkina Faso
 # !!!!! ~~~~~~~~~~~~~~~~ !!!!!!!!!!!! ~~~~~~~~~~~~~#
 
 ### arrival into pre-depature stageing grounds per year 
-ggplot(data=dat, aes(x=factor(year), y=departureGarr))+geom_jitter(width=0.2)
+ggplot(data=dat, aes(x=factor(year), y=departureGarr))+geom_jitter(width=0.2)+
+  geom_jitter(aes(y=rainarrDOY), col=2)
+
+ggplot(data=dat, aes(x=factor(year), y=departureGarr))+geom_boxplot()+
+  geom_boxplot(aes(y=rainarrDOY), col=2)
 
 
 #calc final stopover length (cos we corrected some values in the summary table)
@@ -141,19 +146,53 @@ dat2<-dplyr::arrange(dat2, ptt, year, SO_startDOY, variable)
 dat2$tamRAIN[which(!(1:21375 %in% seq(5,21375, 5)))]<-0
 dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
 
-# select cond during SO..and befoe??
-dat2.1<-subset(dat2, cuck_pres==2)
 
-dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
-  summarise_if(is.numeric, mean, na.rm=T)
+dat2.1<-dat2 %>% subset(cuck_pres==2) %>% group_by(year, ptt, SO_startDOY) %>%
+  summarise_all(first)
+
+dat2.1<-filter(dat2.1, country %in% c("Ghana","Cote d'Ivoire",
+                      "Guinea", "Sierra Leone",
+                      ' Burkina Faso', 'Nigeria'))
 
 
-dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
+dat2.2<-NULL
+dat2.3<-NULL
+for(i in 1:nrow(dat2.1))
+{
+  dat2.2<-rbind(dat2.2,
+                dat2 %>% filter(ptt==dat2.1[i,]$ptt, year==dat2.1[i,]$year, SO_startDOY==dat2.1[i,]$SO_startDOY,
+                  variable==soversWA[soversWA$ptt==dat2.1[i,]$ptt & soversWA$year==dat2.1[i,]$year&
+                               soversWA$SO_startDOY==dat2.1[i,]$SO_startDOY,]$rainarrDOY))
+  dat2.3<-rbind(dat2.3,
+               dat2 %>% filter(ptt==dat2.1[i,]$ptt, year==dat2.1[i,]$year, SO_startDOY==dat2.1[i,]$SO_startDOY,
+                                variable==soversWA[soversWA$ptt==dat2.1[i,]$ptt & soversWA$year==dat2.1[i,]$year&
+                                                     soversWA$SO_startDOY==dat2.1[i,]$SO_startDOY,]$ndviupDOY)) 
+  print(i)
+  }
+
+
+dat2.1$rainTdiff=dat2.1$variable-dat2.2$variable
+
+dat2.1$ndviTdiff=dat2.1$variable-dat2.3$variable
+
+dat2.1$raindiff=dat2.1$cumrf-dat2.2$cumrf
+dat2.1$raindiff2=dat2.1$tamcumrf-dat2.2$tamcumrf
+
+dat2.1$ndvidiff=dat2.1$emodisNDVI-dat2.3$emodisNDVI
+
+dat2.4<-dat2.1 %>% group_by(year, ptt) %>%
   summarise_all(last)
+
+dat2.5<-dat2.1 %>% 
+  group_by(year, ptt) %>%
+  summarise_if(is.numeric, c('mean', 'var'))
+
 
 dat$year<-as.integer(dat$year)
 
-dat3<-full_join(dat, dat2.3, by=c('ptt', 'year'))
+## join em up 
+
+dat3<-left(dat, dat2.4, by=c('ptt', 'year'))
 
 
 ## check each stopover in West Africa
