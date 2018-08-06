@@ -150,7 +150,7 @@ dat2.1<-dat2 %>% subset(cuck_pres==2) %>% group_by(year, ptt, SO_startDOY) %>%
 
 dat2.1<-filter(dat2.1, country %in% c("Ghana","Cote d'Ivoire",
                       "Guinea", "Sierra Leone",
-                      ' Burkina Faso', 'Nigeria'))
+                      'Burkina Faso', 'Nigeria'))
 
 
 dat2.2<-NULL
@@ -232,16 +232,36 @@ dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_sp
 # remember this will calc for all stopovers in WA, not just the subsample
 # that have DEPwestAF values
 
-soversWA$rainarrDOY<-NA
-soversWA$ndviupDOY<-NA
+# update to loop to only look at stopovers in WA for ptts and years of interest
+# for second run, also monsoon arr i.e. when rain actually starts proper
 
-for( i in 1: nrow(soversWA))
+
+
+soversWA<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv', h=T)
+
+dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+
+#soversWA$rainarrDOY<-NA
+#soversWA$ndviupDOY<-NA
+soversWA$monsarrDOY<-NA
+
+for( i in 1:nrow(dat))
 {
-    dtemp<-soversWA[i,]
+  dt<-dat[i,]
+  if(is.na(dt$DEPwestAF)){next}
+  
+    dtemp<-soversWA[soversWA$ptt==dt$ptt & soversWA$year==dt$year,]
     
+    dtemp<-filter(dtemp, country %in% c("Ghana","Cote d'Ivoire",
+                                          "Guinea", "Sierra Leone",
+                                          'Burkina Faso', 'Nigeria'))
     
-    t2<-dat2[dat2$ptt==dtemp$ptt & dat2$year==dtemp$year &
-               dat2$SO_startDOY==dtemp$SO_startDOY,]
+    for(j in 1:nrow(dtemp))
+      
+    {  
+    
+    t2<-dat2[dat2$ptt==dtemp[j,]$ptt & dat2$year==dtemp[j,]$year &
+               dat2$SO_startDOY==dtemp[j,]$SO_startDOY,]
     
     temp=ggplot(data=t2)+
       geom_line( aes(x=variable, y=emodisNDVI*500), colour='dark green')+
@@ -253,11 +273,17 @@ for( i in 1: nrow(soversWA))
     
     print(temp)
     
-    soversWA[i,]$rainarrDOY<-readline('enter rain start DOY')
-    soversWA[i,]$ndviupDOY<-readline('enter ndvi start DOY')
+    soversWA[soversWA$ptt==dtemp[j,]$ptt & soversWA$year==dtemp[j,]$year &
+               soversWA$SO_startDOY==dtemp[j,]$SO_startDOY,]$rainarrDOY<-readline('enter first rain start DOY')
+    soversWA[soversWA$ptt==dtemp[j,]$ptt & soversWA$year==dtemp[j,]$year &
+               soversWA$SO_startDOY==dtemp[j,]$SO_startDOY,]$monsarrDOY<-readline('enter monsoon start DOY')
+    soversWA[soversWA$ptt==dtemp[j,]$ptt & soversWA$year==dtemp[j,]$year &
+               soversWA$SO_startDOY==dtemp[j,]$SO_startDOY,]$ndviupDOY<-readline('enter ndvi start DOY')
 
-  print(i)
-  
+    print(j)
+    }
+    
+    print(i)
 }
 # write.csv(soversWA, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv',quote=F,row.names=F)
 
