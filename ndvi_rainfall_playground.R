@@ -17,8 +17,6 @@ dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_s
 #stopover coord data (median points) - with ndvi and env data (only WA!!)
 soversWA<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv', h=T)
 
-so2<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers_precip_ndvi.csv', h=T)
-
 #extra data for filling migratory route
 
 extraz<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv', h=T)
@@ -180,26 +178,50 @@ dat2.1$raindiff2=dat2.1$tamcumrf-dat2.2$tamcumrf
 
 dat2.1$ndvidiff=dat2.1$emodisNDVI-dat2.3$emodisNDVI
 
+## add in habitat data
+
+so2<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers_precip_ndvi.csv', h=T)
+
+so3<- so2 %>% group_by(ptt, year, SO_startDOY) %>% summarise_all(mean)
+
+#make sure habitat variables per stopover still sum to 100
+
+# we replace all nas in dataset with 0. not a problem as we olny are interested in habitata variables
+
+so3<-so3 %>% replace(., is.na(.), 0)
+
+so3[,25:31]<-round(so3[,25:31]/rowSums(so3[,25:31], na.rm=T) *100)                      
+
+#join habitat to dat2.1
+
+dat2.1<-left_join(dat2.1, so3[,c(1:3,25:31)], by=c('ptt', 'year', 'SO_startDOY'))
+
+
 dat2.4<-dat2.1 %>% group_by(year, ptt) %>%
   summarise_all(last)
 
 dat2.5<-dat2.1 %>% 
   group_by(year, ptt) %>%
-  summarise_if(is.numeric, c('mean', 'sd'))
+  summarise_if(is.numeric, c('mean', 'sd'), na.rm=T)
 
 
 dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:25)], by=c('ptt', 'year'))
+dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:32)], by=c('ptt', 'year'))
 
-names(dat3)[33:41]<-paste(names(dat3)[33:41],'last', sep='_')
+names(dat3)[32:47]<-paste(names(dat3)[32:47],'last', sep='_')
 
-dat4<-left_join(dat3, dat2.5[,c(1,2,16:24, 38:46)], by=c('ptt', 'year'))
+dat4<-left_join(dat3, dat2.5[,c(1,2,16:31, 46:60)], by=c('ptt', 'year'))
+
+#write.csv(dat4, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', quote=F, row.names=F)
+
+######### now ready to model! ###############
+
+dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
 
 
-## now ready to model!
 
 # do ggally pairs 
 # before check with plots how variables behave
