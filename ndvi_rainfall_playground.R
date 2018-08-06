@@ -194,7 +194,7 @@ so3[,25:31]<-round(so3[,25:31]/rowSums(so3[,25:31], na.rm=T) *100)
 
 #join habitat to dat2.1
 
-dat2.1<-left_join(dat2.1, so3[,c(1:3,25:31)], by=c('ptt', 'year', 'SO_startDOY'))
+dat2.1<-left_join(dat2.1, so3[,c(1:3,25:31, 34,35)], by=c('ptt', 'year', 'SO_startDOY'))
 
 
 dat2.4<-dat2.1 %>% group_by(year, ptt) %>%
@@ -209,11 +209,11 @@ dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:32)], by=c('ptt', 'year'))
+dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:34)], by=c('ptt', 'year'))
 
-names(dat3)[32:47]<-paste(names(dat3)[32:47],'last', sep='_')
+names(dat3)[33:50]<-paste(names(dat3)[33:50],'last', sep='_')
 
-dat4<-left_join(dat3, dat2.5[,c(1,2,16:31, 46:60)], by=c('ptt', 'year'))
+dat4<-left_join(dat3, dat2.5[,c(1,2,16:33, 47:64)], by=c('ptt', 'year'))
 
 #write.csv(dat4, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', quote=F, row.names=F)
 
