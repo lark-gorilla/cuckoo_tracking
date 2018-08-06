@@ -70,6 +70,10 @@ dat<-left_join(dat, soversWA %>%
                by=c('ptt', 'year'))
 
 
+#calc final stopover length (cos we corrected some values in the summary table)
+
+dat$dur_finalSO=dat$DEPwestAF-dat$st_finalSO
+
 # explaining departure rate using depature staging grounds
 
 # factor 1: arrival time at departure grounds dictates departure 
@@ -112,10 +116,6 @@ ggplot(data=dat, aes(x=factor(year), y=departureGarr))+geom_boxplot()+
   geom_boxplot(aes(y=rainarrDOY), col=2)
 
 
-#calc final stopover length (cos we corrected some values in the summary table)
-
-dat$dur_finalSO=dat$DEPwestAF-dat$st_finalSO
-
 #### AND THE ENV DATA #####
 
 env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
@@ -144,7 +144,7 @@ dat2<-dplyr::arrange(dat2, ptt, year, SO_startDOY, variable)
 dat2$tamRAIN[which(!(1:21375 %in% seq(5,21375, 5)))]<-0
 dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
 
-
+# takes the first row of each stopover. i.e. conditions when birds chose the SO
 dat2.1<-dat2 %>% subset(cuck_pres==2) %>% group_by(year, ptt, SO_startDOY) %>%
   summarise_all(first)
 
@@ -155,6 +155,7 @@ dat2.1<-filter(dat2.1, country %in% c("Ghana","Cote d'Ivoire",
 
 dat2.2<-NULL
 dat2.3<-NULL
+dat2.3a<-NULL
 for(i in 1:nrow(dat2.1))
 {
   dat2.2<-rbind(dat2.2,
@@ -165,6 +166,11 @@ for(i in 1:nrow(dat2.1))
                dat2 %>% filter(ptt==dat2.1[i,]$ptt, year==dat2.1[i,]$year, SO_startDOY==dat2.1[i,]$SO_startDOY,
                                 variable==soversWA[soversWA$ptt==dat2.1[i,]$ptt & soversWA$year==dat2.1[i,]$year&
                                                      soversWA$SO_startDOY==dat2.1[i,]$SO_startDOY,]$ndviupDOY)) 
+  dat2.3a<-rbind(dat2.3a,
+                dat2 %>% filter(ptt==dat2.1[i,]$ptt, year==dat2.1[i,]$year, SO_startDOY==dat2.1[i,]$SO_startDOY,
+                                variable==soversWA[soversWA$ptt==dat2.1[i,]$ptt & soversWA$year==dat2.1[i,]$year&
+                                                     soversWA$SO_startDOY==dat2.1[i,]$SO_startDOY,]$monsarrDOY)) 
+  
   print(i)
   }
 
@@ -173,8 +179,12 @@ dat2.1$rainTdiff=dat2.1$variable-dat2.2$variable
 
 dat2.1$ndviTdiff=dat2.1$variable-dat2.3$variable
 
+dat2.1$monsTdiff=dat2.1$variable-dat2.3a$variable
+
 dat2.1$raindiff=dat2.1$cumrf-dat2.2$cumrf
 dat2.1$raindiff2=dat2.1$tamcumrf-dat2.2$tamcumrf
+dat2.1$monsdiff=dat2.1$cumrf-dat2.3a$cumrf
+dat2.1$monsdiff2=dat2.1$tamcumrf-dat2.3a$tamcumrf
 
 dat2.1$ndvidiff=dat2.1$emodisNDVI-dat2.3$emodisNDVI
 
@@ -209,11 +219,11 @@ dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:34)], by=c('ptt', 'year'))
+dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
 
-names(dat3)[33:50]<-paste(names(dat3)[33:50],'last', sep='_')
+names(dat3)[33:53]<-paste(names(dat3)[33:53],'last', sep='_')
 
-dat4<-left_join(dat3, dat2.5[,c(1,2,16:33, 47:64)], by=c('ptt', 'year'))
+dat4<-left_join(dat3, dat2.5[,c(1,2,16:36, 50:70)], by=c('ptt', 'year'))
 
 #write.csv(dat4, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', quote=F, row.names=F)
 
@@ -221,7 +231,7 @@ dat4<-left_join(dat3, dat2.5[,c(1,2,16:33, 47:64)], by=c('ptt', 'year'))
 
 dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
 
-
+# check if last info from dat2 joins matches last info from original approach
 
 # do ggally pairs 
 # before check with plots how variables behave
@@ -285,5 +295,35 @@ for( i in 1:nrow(dat))
     
     print(i)
 }
+
+# manual fix for missed ones
+
+soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+           soversWA$SO_startDOY==63,]$rainarrDOY<-5
+  soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+             soversWA$SO_startDOY==63,]$monsarrDOY<-25
+  soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+             soversWA$SO_startDOY==63,]$ndviupDOY<-40
+  
+  soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+             soversWA$SO_startDOY==73,]$rainarrDOY<-20
+  soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+             soversWA$SO_startDOY==73,]$monsarrDOY<-65
+  soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
+             soversWA$SO_startDOY==73,]$ndviupDOY<-60
+  
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==90,]$rainarrDOY<-28
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==90,]$monsarrDOY<-48
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==90,]$ndviupDOY<-40
+  
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==96,]$rainarrDOY<-30
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==96,]$monsarrDOY<-75
+  soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
+             soversWA$SO_startDOY==96,]$ndviupDOY<-30
 # write.csv(soversWA, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv',quote=F,row.names=F)
 
