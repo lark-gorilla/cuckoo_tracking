@@ -64,9 +64,7 @@ dat<-left_join(dat, soversWA %>%
                  group_by(ptt, year) %>%
                  summarise(firstCdepartureG=first(country),
                            departureGarr=first(SO_startDOY),
-                           nSOdepartureG=n(),
-                            rainarrDOY=first(rainarrDOY),
-                            ndviupDOY=first(ndviupDOY)),
+                           nSOdepartureG=n()),
                by=c('ptt', 'year'))
 
 
@@ -206,6 +204,8 @@ so3[,25:31]<-round(so3[,25:31]/rowSums(so3[,25:31], na.rm=T) *100)
 
 dat2.1<-left_join(dat2.1, so3[,c(1:3,25:31, 34,35)], by=c('ptt', 'year', 'SO_startDOY'))
 
+dat2.4a<-dat2.1 %>% group_by(year, ptt) %>%
+  summarise_all(first)
 
 dat2.4<-dat2.1 %>% group_by(year, ptt) %>%
   summarise_all(last)
@@ -219,9 +219,13 @@ dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3<-left_join(dat, dat2.4[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
+dat3.1<-left_join(dat, dat2.4a[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
 
-names(dat3)[33:53]<-paste(names(dat3)[33:53],'last', sep='_')
+names(dat3.1)[31:51]<-paste(names(dat3.1)[31:51],'first', sep='_')
+
+dat3<-left_join(dat3.1, dat2.4[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
+
+names(dat3)[52:72]<-paste(names(dat3)[52:72],'last', sep='_')
 
 dat4<-left_join(dat3, dat2.5[,c(1,2,16:36, 50:70)], by=c('ptt', 'year'))
 
