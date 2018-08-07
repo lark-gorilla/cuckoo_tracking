@@ -60,7 +60,8 @@ dat<-left_join(dat, soversWA %>% group_by(ptt, year) %>%
 dat<-left_join(dat, soversWA %>%
                  filter(country %in% c("Ghana","Cote d'Ivoire",
                                        "Guinea", "Sierra Leone",
-                                       ' Burkina Faso', 'Nigeria')) %>%
+                                       ' Burkina Faso', 'Togo','Liberia',
+                                       'Nigeria')) %>%
                  group_by(ptt, year) %>%
                  summarise(firstCdepartureG=first(country),
                            departureGarr=first(SO_startDOY),
@@ -148,7 +149,7 @@ dat2.1<-dat2 %>% subset(cuck_pres==2) %>% group_by(year, ptt, SO_startDOY) %>%
 
 dat2.1<-filter(dat2.1, country %in% c("Ghana","Cote d'Ivoire",
                       "Guinea", "Sierra Leone",
-                      'Burkina Faso', 'Nigeria'))
+                      'Burkina Faso', 'Togo','Liberia','Nigeria'))
 
 
 dat2.2<-NULL
@@ -231,16 +232,7 @@ dat4<-left_join(dat3, dat2.5[,c(1,2,16:36, 50:70)], by=c('ptt', 'year'))
 
 #write.csv(dat4, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', quote=F, row.names=F)
 
-######### now ready to model! ###############
-
-dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
-
-# check if last info from dat2 joins matches last info from original approach
-
-# do ggally pairs 
-# before check with plots how variables behave
-# also join in habitat 
-
+######### now ready to model! - in next script ###############
 
 # Loop to identify and add start of rains and greening to stopover table
 # remember this will calc for all stopovers in WA, not just the subsample
@@ -248,8 +240,6 @@ dat<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_sp
 
 # update to loop to only look at stopovers in WA for ptts and years of interest
 # for second run, also monsoon arr i.e. when rain actually starts proper
-
-
 
 soversWA<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv', h=T)
 
@@ -329,5 +319,8 @@ soversWA[soversWA$ptt==128296 & soversWA$year==2014 &
              soversWA$SO_startDOY==96,]$monsarrDOY<-75
   soversWA[soversWA$ptt==134955 & soversWA$year==2015 &
              soversWA$SO_startDOY==96,]$ndviupDOY<-30
+  
+  soversWA[soversWA$country=='Togo',]
+  soversWA[soversWA$country=='Liberia',]
 # write.csv(soversWA, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH_weastAF_rfndvistart.csv',quote=F,row.names=F)
 
