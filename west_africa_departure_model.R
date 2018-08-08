@@ -7,6 +7,34 @@ library(ggplot2)
 library(GGally)
 library(lme4)
 library(MuMIn)
+library(car)
+
+# model vis function
+
+predplot<-function(mod=m1, variable='departureGarr'){
+newdat<-data.frame(v1=seq(min(dmod[,which(names(dmod)==variable)]),
+                          max(dmod[,which(names(dmod)==variable)]),
+                          (max(dmod[,which(names(dmod)==variable)])- 
+                             min(dmod[,which(names(dmod)==variable)]))/100),
+                   DEPwestAF=1)
+names(newdat)[1]<-names(dmod)[which(names(dmod)==variable)]
+newdat$p1<-predict(mod, newdata=newdat, re.form=~0)
+
+f1<-as.formula(paste('DEPwestAF~', names(dmod)[which(names(dmod)==variable)]))
+
+predmat<-model.matrix(f1, data=newdat)
+vcv<-vcov(mod)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dmod, x=dmod[,which(names(dmod)==variable)]
+, y=DEPwestAF)+
+  geom_line(data=newdat, aes(x=newdat[,which(names(newdat)==variable)], y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=newdat[,which(names(newdat)==variable)], y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=newdat[,which(names(newdat)==variable)], y=uc), colour='red', linetype='dashed')+
+  ylab("Departure date West Africa (DOY)")+
+  theme_bw()}
 
 if(Sys.info()['nodename']=="D9L5812"){
   setwd("C:/cuckoo_tracking")}else{
@@ -86,7 +114,7 @@ ggpairs(dat[,c(6,28,29,73,74,94,95)]) # tdiff mean
 
 # monsTdiff_first # does synchronicity with monsoon rains at first stopover
 
-# monsTdiff_first * raindiff2 # does rate of rainfall at first stopover impact?
+# monsTdiff_first * raindiff2_first # does rate of rainfall at first stopover impact?
 
 # emodisNDVI_last # does greenness of last stopover impact?
 
@@ -102,17 +130,105 @@ ggpairs(dat[,c(6,28,29,73,74,94,95)]) # tdiff mean
 
 # how we looking
 
-ggpairs(dat[,c(6,28,35,39,52,57,63,74,85,87,92)]) 
+ggpairs(dat[,c(6,28,29,37,39,52,57,63,74,85,87,92)]) 
+
+# sort NAs
+
+dmod<-dat[,c(1,2,6,28,29,37,39,52,57,63,74,85,87,92)]
+
+dmod<-na.omit(dmod)
+
+#explore relationships with basic model
+
+# forwards stepwise selection using most mechanistic/simplistic metrics first
+
+m1<-lmer(DEPwestAF~departureGarr+(1|ptt)+(1|year), data=dmod)
+             
+predplot(mod=m1, variable=departureGarr)             
+             
+ggplot(data=dmod, aes(x=departureGarr, y=DEPwestAF))+geom_point(shape=1)
 
 
-m1<-lmer(DEPwestAF)
+ggplot(data=dmod, aes(x=departureGarr, y=DEPwestAF))+geom_point(shape=1)
 
 
+# only real issue is departureGarr and raindiff2. could just do 
+# monsTdiff_first*departureGarr as surrogate
+# have a look with dredge
 
-# Not sure I should be doing, all I need to say is that they don't arrive before
-# first rain.
+m1<-lmer(DEPwestAF~departureGarr+nSOdepartureG+monsTdiff_first * raindiff2_first+
+           emodisNDVI_last+ndviTdiff_last * ndvidiff_last+emodisANOM_mean+
+           Trees_mean+Croplands_mean+d_river_mean+(1|ptt)+(1|year), data=dmod,
+         na.action = na.fail)
 
-## explain arrival into WA in terms of rainfall and ndvi
+m2<-dredge(m1)
+
+
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+names(env)[names(env)=='value']<-'precip'
+names(env)[names(env)=='value2']<-'ndvi'
+env$cuck_pres<-as.numeric(env$cuck_pres) # abs=1, pres=2
+
+dat2<- env[,c(2,3,4,5,10:22)] %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise_all(mean,na.rm=T) 
+
+temp<- env %>% group_by(year, ptt, SO_startDOY, variable) %>% summarise(country=first(country))
+
+dat2$country<-temp$country
+
+dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
+dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
+
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+# for tamsat cumrf
+dat2<-dplyr::arrange(dat2, ptt, year, SO_startDOY, variable)
+dat2$tamRAIN[which(!(1:21375 %in% seq(5,21375, 5)))]<-0
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
+
+temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
+
+temp3<-temp %>% group_by(variable) %>%
+  summarise(Mcumrf=mean(tamcumrf), rfmin=mean(tamcumrf)-sd(tamcumrf), rfmax=mean(tamcumrf)+sd(tamcumrf),
+   MaquaNDVI=mean(emodisNDVI, na.rm=T), ndmin=(mean(emodisNDVI, na.rm=T)-sd(emodisNDVI, na.rm=T)),
+   ndmax=(mean(emodisNDVI, na.rm=T)+sd(emodisNDVI, na.rm=T)))
+
+ggplot(data=dmod, aes(x=departureGarr, y=DEPwestAF, colour=DEPwestAF-departureGarr))+
+  geom_line(data=temp3,aes(x=variable, y=Mcumrf/2), size=1, colour='blue')+
+  geom_line(data=temp3,aes(x=variable, y=rfmin/2), colour='grey', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=rfmax/2), colour='grey', linetype=2)+ 
+  geom_line(data=temp3,aes(x=variable, y=MaquaNDVI*100), size=1, colour='dark green')+
+  geom_line(data=temp3,aes(x=variable, y=ndmin*100), colour='orange', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=ndmax*100), colour='orange', linetype=2)+
+  geom_point()+
+  scale_colour_gradientn(colours=terrain.colors(10))+
+  theme_bw()
+
+#colour graded background:
+#https://stackoverflow.com/questions/39466505/diagonal-grading-of-background-color-of-ggplot-graph-in-r
+
+df <- expand.grid(departureGarr=25:100,
+                  DEPwestAF=75:130)
+
+df$filly=df$DEPwestAF-df$departureGarr 
+
+df[df$filly<0 | df$filly>80,]$filly<-NA
+
+ggplot() + 
+  geom_tile(data=df, aes(x=departureGarr, y=DEPwestAF, fill=filly),alpha = 0.75) +      
+  scale_fill_gradient(low='#ffeda0', high='#f03b20', na.value=NA)+
+  geom_line(data=temp3,aes(x=variable, y=Mcumrf/2), size=1, colour='blue')+
+  geom_line(data=temp3,aes(x=variable, y=rfmin/2), colour='grey', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=rfmax/2), colour='grey', linetype=2)+ 
+  geom_line(data=temp3,aes(x=variable, y=MaquaNDVI*100), size=1, colour='dark green')+
+  geom_line(data=temp3,aes(x=variable, y=ndmin*100), colour='orange', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=ndmax*100), colour='orange', linetype=2)+
+  geom_point(data=dmod, aes(x=departureGarr, y=DEPwestAF), shape=1)+
+  theme_bw()
+  
+  
+  geom_line(data=data.frame(x=25:100, y=(25:100)+28.73), aes(x=x, y=y))
 
 m1<-lmer(departureGarr~(departureGarr-rainTdiff_first)+(1|ptt)+(1|year), data=dat)
 
