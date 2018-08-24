@@ -20,6 +20,7 @@ library('splines')
 library('sf')
 library('leaflet')
 library('gridExtra')
+library('MuMIn')
 
 
 if(Sys.info()['nodename']=="D9L5812"){
@@ -129,6 +130,16 @@ dat2.1<-subset(dat2, cuck_pres==2)
 
 dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
   summarise_if(is.numeric, mean, na.rm=T)
+
+# read in model-ready dataset
+
+dmod<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+
+dmod$tWA=dmod$DEPwestAF-dmod$departureGarr
+
+dmod<-dmod[,c(1,2,6,22,27,28,29,37,39,52,57,63,74,85,87,92, 115)]
+
+dmod<-na.omit(dmod)
 
 ```
 
@@ -383,6 +394,231 @@ m1<-lmer(DEPwestAF~breeding_loc+(1|year)+(1|ptt), data=dat)
 ggplot(data=dtemp, aes(x=dep_country, y=DEPwestAF ))+xlab("Departure country")+ylab("Departure date West Africa (DOY)")+geom_jitter(width=0.1,shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=0.552, p=0.735', x = -Inf, y = Inf), hjust = 0, vjust = 1)+theme(axis.text.x=element_text(angle=90))
 ```
 
+Taking a step back, it is important to if there is any environmental
+control over how birds arrive into West Africa.
+
+Drought-breaking rains do not limit departure date specifically, however they do limit arrival into West Africa from Central Africa. Birds do not move into West Africa until rains have arrived. Blue blur is rainfall for each stopover, black line is first arrival of cuckoo and red lines are subsequent stopovers.
+
+```{r, warning=F, message=F, echo=F}
+
+
+temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
+
+temp$country<-factor(temp$country, levels=c('Nigeria', 'Togo', 'Ghana', "Cote d'Ivoire", 'Guinea', 'Sierra Leone'))
+
+ggplot()+geom_line(data=temp[temp$cumrf>0,],aes(x=variable, y=cumrf, group=paste(ptt, year,SO_startDOY)), size=2, alpha=0.08, colour='blue')+theme_bw()+geom_vline(data=(temp %>% group_by(ptt, year, SO_startDOY) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='red', alpha=0.5)+
+  geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+facet_wrap(~country)+xlab("Day of year")+
+  ylab("Cumulative rainfall (mm)")
+
+```
+
+Shown with mean rainfall (blue line) and NDVI (green line) per country and mean arrival date for first stopovers in West Africa (red line), we can see rains arrive at generally the same time in Cote d'Ivoire and Ghana and so do cuckoos
+
+```{r, warning=F, message=F, echo=F, fig.height=12, fig.width=6}
+
+temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
+
+temp$country<-factor(temp$country, levels=c('Nigeria', 'Togo', 'Ghana', "Cote d'Ivoire", 'Guinea', 'Sierra Leone'))
+
+
+temp2<-temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first) %>% group_by(country) %>% summarise(MSO_startDOY=mean(SO_startDOY), Mrf=mean(cumrf), Mnd=mean(aquaNDVI))
+
+
+temp3<-temp %>% group_by(country, variable) %>% summarise(Mcumrf=mean(cumrf), rfmin=mean(cumrf)-sd(cumrf), rfmax=mean(cumrf)+sd(cumrf),                                                          MaquaNDVI=mean(aquaNDVI, na.rm=T), ndmin=(mean(aquaNDVI, na.rm=T)-sd(aquaNDVI, na.rm=T)), ndmax=(mean(aquaNDVI, na.rm=T)+sd(aquaNDVI, na.rm=T)))
+
+
+p1<-ggplot()+
+geom_line(data=temp3,aes(x=variable, y=Mcumrf), size=1, colour='blue')+
+geom_line(data=temp3,aes(x=variable, y=rfmin), colour='grey', linetype=2)+
+geom_line(data=temp3,aes(x=variable, y=rfmax), colour='grey', linetype=2)+  
+geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp2, aes(xintercept = MSO_startDOY), colour='red', size=1)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("Cumulative rainfall (mm)")+theme_bw()
+
+p2<-ggplot()+geom_line(data=temp3,aes(x=variable, y=MaquaNDVI), size=1, colour='dark green')+
+geom_line(data=temp3,aes(x=variable, y=ndmin), colour='orange', linetype=2)+
+geom_line(data=temp3,aes(x=variable, y=ndmax), colour='orange', linetype=2)+
+geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
+geom_vline(data=temp2, aes(xintercept = MSO_startDOY), colour='red', size=1)+
+   facet_grid(country~.)+xlab("Day of year")+
+  ylab("NDVI")+theme_bw()
+
+grid.arrange(p1, p2, ncol=2)
+
+```
+
+Despite rain generally arriving in West Africa at the same time, there
+is variance of ~ 60 days in the times in which cuckoos arrive into
+West Africa (with the bulk of birds arriving between day 55 and day 95)
+
+There is however, little relationship between arrival date into West Africa
+and departure date from West Africa
+
+```{r, warning=F, message=F, echo=F}
+
+m1<-lmer(DEPwestAF~departureGarr+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF%in%85:120,])
+
+ggplot(data=dmod, aes(x=departureGarr, y=DEPwestAF ))+xlab("Arrival into West Africa (DOY)")+ylab("Departure date West Africa (DOY)")+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=1.83, p=0.185 *3 outliers removed*', x = -Inf, y = Inf), hjust = 0, vjust = 1) 
+
+#Anova(m1, test.statistic = 'F')
+
+```
+
+Note: if the above model includes the 3 outliers then a there is a significant relationship... * need to decide which is more biologically plausible*
+
+```{r, warning=F, message=F, echo=F}
+m1<-lmer(DEPwestAF~departureGarr+(1|ptt)+(1|year), data=dmod)
+#Anova(m1, test.statistic = 'F')
+
+newdat<-data.frame(DEPwestAF=1, departureGarr=25:100)
+newdat$p1<-predict(m1, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(DEPwestAF~departureGarr, data=newdat)
+vcv<-vcov(m1)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dmod, y=DEPwestAF, x=departureGarr)+
+  geom_line(data=newdat, aes(x=departureGarr, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=departureGarr, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=departureGarr, y=uc), colour='red', linetype='dashed')+
+  ylab("Days spent in West Africa")+
+  xlab("Arrival into West Africa (DOY)")+
+  theme_bw()+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=10.47, p=0.0027', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+```
+
+Because almost all birds depart West Africa between day 90 and day 110,
+later arriving birds spend significantly shorter time in West Africa
+
+```{r, warning=F, message=F, echo=F}
+m1<-lmer(tWA~departureGarr+(1|year)+(1|ptt), data=dmod)
+
+#Anova(m1, test.statistic = 'F')
+
+newdat<-data.frame(tWA=1, departureGarr=25:100)
+newdat$p1<-predict(m1, newdata=newdat, re.form=~0)
+
+predmat<-model.matrix(tWA~departureGarr, data=newdat)
+vcv<-vcov(m1)
+semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+newdat$lc<-newdat$p1-semod*1.96
+newdat$uc<-newdat$p1+semod*1.96
+
+qplot(data=dmod, y=tWA, x=departureGarr)+
+  geom_line(data=newdat, aes(x=departureGarr, y=p1), colour='red')+
+  geom_line(data=newdat, aes(x=departureGarr, y=lc), colour='red', linetype='dashed')+
+  geom_line(data=newdat, aes(x=departureGarr, y=uc), colour='red', linetype='dashed')+
+  ylab("Days spent in West Africa")+
+  xlab("Arrival into West Africa (DOY)")+
+  theme_bw()+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=63.35, p=3.19e-09', x = -Inf, y = Inf), hjust = 0, vjust = 1)
+```
+
+When graphed with average rainfall and ndvi curved (across all WA stopovers) we see that early arriving birds into West Africa spend a long time there when greening is yet to/just starting whereas late arriving birds spend a short time at near-peak greenness. Interestingly,
+the mean arrival date into west africa (day 71; black line) corresponds with earlier departures, which could be facilitated by concurrent peak greening and rainfall rates.
+
+
+```{r, warning=F, message=F, echo=F}
+temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
+
+temp3<-temp %>% group_by(variable) %>%
+  summarise(Mcumrf=mean(tamcumrf), rfmin=mean(tamcumrf)-sd(tamcumrf), rfmax=mean(tamcumrf)+sd(tamcumrf),
+   MaquaNDVI=mean(emodisNDVI, na.rm=T), ndmin=(mean(emodisNDVI, na.rm=T)-sd(emodisNDVI, na.rm=T)),
+   ndmax=(mean(emodisNDVI, na.rm=T)+sd(emodisNDVI, na.rm=T)))
+
+#lets make variable!
+
+ggplot(data=dmod, aes(x=departureGarr, y=DEPwestAF))+
+  geom_line(data=temp3,aes(x=variable, y=Mcumrf/2), size=1, colour='blue')+
+  geom_line(data=temp3,aes(x=variable, y=rfmin/2), colour='grey', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=rfmax/2), colour='grey', linetype=2)+ 
+  geom_line(data=temp3,aes(x=variable, y=MaquaNDVI*100), size=1, colour='dark green')+
+  geom_line(data=temp3,aes(x=variable, y=ndmin*100), colour='orange', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=ndmax*100), colour='orange', linetype=2)+
+  geom_point(aes(colour=tWA))+scale_y_continuous(breaks=seq(0, 130, 10), limits=c(0,130))+
+  scale_x_continuous(breaks=seq(0, 130, 10))+
+  scale_colour_gradientn(colours=topo.colors(8))+
+  theme_bw()+labs(y="Departure from West Africa (DOY)", x="Arrival into West Africa (DOY)", colour='Days in WA')+geom_vline(aes(xintercept=71), colour='black')
+```
+
+Visualised another way with time coloured gradient.
+
+```{r, warning=F, message=F, echo=F} 
+df <- expand.grid(departureGarr=0:130,
+                  DEPwestAF=75:130)
+
+df$filly=df$DEPwestAF-df$departureGarr 
+
+df[df$filly<0 | df$filly>80,]$filly<-NA
+
+
+ggplot() + 
+  geom_tile(data=df, aes(x=departureGarr, y=DEPwestAF, fill=filly),alpha = 0.75) +      
+  scale_fill_gradient(low='#ffeda0', high='#f03b20', na.value=NA)+
+  geom_line(data=temp3,aes(x=variable, y=Mcumrf/2), size=1, colour='blue')+
+  geom_line(data=temp3,aes(x=variable, y=rfmin/2), colour='grey', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=rfmax/2), colour='grey', linetype=2)+ 
+  geom_line(data=temp3,aes(x=variable, y=MaquaNDVI*100), size=1, colour='dark green')+
+  geom_line(data=temp3,aes(x=variable, y=ndmin*100), colour='orange', linetype=2)+
+  geom_line(data=temp3,aes(x=variable, y=ndmax*100), colour='orange', linetype=2)+
+  geom_point(data=dmod, aes(x=departureGarr, y=DEPwestAF), shape=1)+
+  theme_bw()+scale_y_continuous(breaks=seq(0, 130, 10), limits=c(0,130))+
+  scale_x_continuous(breaks=seq(0, 130, 10))+
+  labs(y="Departure from West Africa (DOY)", x="Arrival into West Africa (DOY)", fill='Days in WA')+geom_vline(aes(xintercept=71), colour='black')
+
+
+```
+
+OK so are there any explanatory variables that can improve a model
+
+```{r, warning=F, message=F, echo=F} 
+
+# make two gradient metrics
+
+dmod$ndvi_last_ang<-dmod$ndviTdiff_last*dmod$ndvidiff_last
+dmod$rain_first_ang<-(dmod$monsTdiff_first+25)*dmod$raindiff2_first
+
+
+
+m0<-lmer(DEPwestAF~(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m1<-lmer(DEPwestAF~dep_country+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m2<-lmer(DEPwestAF~firstCdepartureG+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m3<-lmer(DEPwestAF~departureGarr+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m4<-lmer(DEPwestAF~nSOdepartureG+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m5<-lmer(DEPwestAF~monsTdiff_first+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m6<-lmer(DEPwestAF~raindiff2_first+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m7<-lmer(DEPwestAF~emodisNDVI_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m8<-lmer(DEPwestAF~ndviTdiff_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m9<-lmer(DEPwestAF~ndvidiff_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m10<-lmer(DEPwestAF~emodisANOM_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m11<-lmer(DEPwestAF~Trees_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m12<-lmer(DEPwestAF~Croplands_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+m13<-lmer(DEPwestAF~d_river_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+
+m14<-lmer(DEPwestAF~rain_first_ang+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+
+m15<-lmer(DEPwestAF~ndvi_last_ang+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
+
+
+anova(m0,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10, m11, m12,m13, m14, m15)
+
+moddat<-dmod[dmod$DEPwestAF %in% 85:120,]
+
+mfin<-lmer(DEPwestAF~departureGarr+nSOdepartureG+monsTdiff_first*raindiff2_first+emodisNDVI_last+ndviTdiff_last*ndvidiff_last+emodisANOM_mean+Trees_mean+Croplands_mean+d_river_mean+(1|ptt)+(1|year), data=moddat,  na.action = na.fail)
+
+mdr<-dredge(mfin)
+
+get.models(mdr, subset = delta < 4, method = "REML")
+
+#qplot(data=dmod[dmod$DEPwestAF %in% 85:120,], y=DEPwestAF, x=nSOdepartureG)
+
+#qplot(data=dmod[dmod$DEPwestAF %in% 85:120,], y=DEPwestAF, x=ndviTdiff_last)
+
+#qplot(data=dmod[dmod$DEPwestAF %in% 85:120 & dmod$emodisANOM_mean>-0.05,], y=DEPwestAF, x=emodisANOM_mean)
+```
+
+
 So what do these early leaving birds do in their runup to departing Cote d'Ivoire that is different to other birds? The tracks of early departing birds are grouped with blue lines and late departing with orange lines. Each stopover is coloured either red (indicating below average NDVI) or green (above average NDVI) to see if early birds chain together 'greener stopovers.
 
 ```{r, warning=F, message=F, echo=F} 
@@ -445,7 +681,7 @@ ggplot(data=dat, aes(x=Tree, y=DEPwestAF ))+xlab("% tree cover of final stopover
 ```
 
 
-The percentage of grass cover does appear to affect departure date. * Not sure how believeable this is*
+The percentage of grass cover does appear to affect departure date. *Not sure how believeable this is*
 
 
 ```{r, warning=F, message=F, echo=F} 
@@ -532,64 +768,3 @@ qplot(data=dat3, x=aquaANOM, y=DEPwestAF)+
 ```
 
 
-Drought-breaking rains do not limit departure date specifically, however they do limit arrival into West Africa from Central Africa. Birds do not move into West Africa until rains have arrived. Blue blur is rainfall for each stopover, black line is first arrival of cuckoo and red lines are subsequent stopovers.
-
-```{r, warning=F, message=F, echo=F}
-
-
-temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
-
-temp$country<-factor(temp$country, levels=c('Nigeria', 'Togo', 'Ghana', "Cote d'Ivoire", 'Guinea', 'Sierra Leone'))
-
-ggplot()+geom_line(data=temp[temp$cumrf>0,],aes(x=variable, y=cumrf, group=paste(ptt, year,SO_startDOY)), size=2, alpha=0.08, colour='blue')+theme_bw()+geom_vline(data=(temp %>% group_by(ptt, year, SO_startDOY) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='red', alpha=0.5)+
-  geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+facet_wrap(~country)+xlab("Day of year")+
-  ylab("Cumulative rainfall (mm)")
-
-```
-
-Shown with mean rainfall (blue line) and NDVI (green line) per country and mean arrival date for first stopovers in West Africa (red line), we can see rains arrive at generally the same time in Cote d'Ivoire and Ghana and so do cuckoos
-
-```{r, warning=F, message=F, echo=F, fig.height=12, fig.width=6}
-
-temp<- dat2[- which(dat2$country %in% c('Angola', 'Central African Republic','Congo', 'Democratic Republic of the Congo', 'Gabon',  'Cameroon', 'Burkina Faso', 'Liberia')),] 
-
-temp$country<-factor(temp$country, levels=c('Nigeria', 'Togo', 'Ghana', "Cote d'Ivoire", 'Guinea', 'Sierra Leone'))
-
-
-temp2<-temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first) %>% group_by(country) %>% summarise(MSO_startDOY=mean(SO_startDOY), Mrf=mean(cumrf), Mnd=mean(aquaNDVI))
-
-
-temp3<-temp %>% group_by(country, variable) %>% summarise(Mcumrf=mean(cumrf), rfmin=mean(cumrf)-sd(cumrf), rfmax=mean(cumrf)+sd(cumrf),                                                          MaquaNDVI=mean(aquaNDVI, na.rm=T), ndmin=(mean(aquaNDVI, na.rm=T)-sd(aquaNDVI, na.rm=T)), ndmax=(mean(aquaNDVI, na.rm=T)+sd(aquaNDVI, na.rm=T)))
-
-
-p1<-ggplot()+
-geom_line(data=temp3,aes(x=variable, y=Mcumrf), size=1, colour='blue')+
-geom_line(data=temp3,aes(x=variable, y=rfmin), colour='grey', linetype=2)+
-geom_line(data=temp3,aes(x=variable, y=rfmax), colour='grey', linetype=2)+  
-geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
-geom_vline(data=temp2, aes(xintercept = MSO_startDOY), colour='red', size=1)+
-   facet_grid(country~.)+xlab("Day of year")+
-  ylab("Cumulative rainfall (mm)")+theme_bw()
-
-p2<-ggplot()+geom_line(data=temp3,aes(x=variable, y=MaquaNDVI), size=1, colour='dark green')+
-geom_line(data=temp3,aes(x=variable, y=ndmin), colour='orange', linetype=2)+
-geom_line(data=temp3,aes(x=variable, y=ndmax), colour='orange', linetype=2)+
-geom_vline(data=(temp[temp$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)), aes(xintercept = SO_startDOY), colour='black', alpha=0.5)+
-geom_vline(data=temp2, aes(xintercept = MSO_startDOY), colour='red', size=1)+
-   facet_grid(country~.)+xlab("Day of year")+
-  ylab("NDVI")+theme_bw()
-
-grid.arrange(p1, p2, ncol=2)
-
-```
-
-
-The first stopover in West Africa is timed to catch rains
-
-```{r, warning=F, message=F, echo=F}
-
-temp<-dat2[dat2$cuck_pres==2,] %>% group_by(ptt, year) %>% summarise_all(first)
-
-qplot(data=temp, x=SO_startDOY, y=cumrf)+facet_wrap(~country)+theme_bw()+xlim(c(0,120))+xlab("Day of year")+ylab("Cumulative rainfall (mm)")
-```
-                                                                                  
