@@ -60,7 +60,7 @@ dat<-left_join(dat, soversWA %>% group_by(ptt, year) %>%
 dat<-left_join(dat, soversWA %>%
                  filter(country %in% c("Ghana","Cote d'Ivoire",
                                        "Guinea", "Sierra Leone",
-                                       ' Burkina Faso', 'Togo','Liberia',
+                                       'Burkina Faso', 'Togo','Liberia',
                                        'Nigeria')) %>%
                  group_by(ptt, year) %>%
                  summarise(firstCdepartureG=first(country),
