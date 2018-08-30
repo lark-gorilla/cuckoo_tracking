@@ -1,0 +1,105 @@
+---
+title: "West Africa cuckoo stopover rainfall patterns"
+author: "Mark Miller"
+date: "31 July 2018"
+output: html_document
+---
+
+
+```{r cuckoos, echo=FALSE, message=F, warning=F, fig.height=9}
+
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+ if(Sys.info()['nodename']=="D9L5812"){
+   setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+
+  
+library(ggplot2)
+library(dplyr)
+#summary data
+dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
+
+# set NA or manually correct cuckoo depature dates that
+# are incorrect, from manual examination
+
+dat[dat$ptt==115586 & dat$year==2014,]$DEPwestAF<-106
+dat[dat$ptt==134955 & dat$year==2015,]$DEPwestAF<-NA
+dat[dat$ptt==134956 & dat$year==2015,]$DEPwestAF<-NA
+
+# and dead ones
+dat[dat$ptt==128296 & dat$year==2014,]$DEPwestAF<-NA
+
+env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+
+names(env)[names(env)=='value']<-'precip'
+names(env)[names(env)=='value2']<-'ndvi'
+env$cuck_pres<-as.numeric(env$cuck_pres) # abs=1, pres=2
+
+dat<-left_join(dat, env %>% group_by(ptt, year) %>% arrange(SO_startDOY, variable, .by_group=T) %>%
+                 summarise(dep_country=last(country)),
+               by=c('ptt', 'year'))
+
+# can test individual countries
+#dat<-dat[dat$dep_country=="Cote d'Ivoire",]
+#dat<-dat[dat$dep_country=="Ghana",]
+
+# summarise data for each stopover so that value per date is the mean
+# of the detail coords values
+
+dat2<- env[,c(2,3,4,5,10:22)] %>% group_by(year, ptt, SO_startDOY, variable) %>%
+  summarise_all(mean,na.rm=T) 
+
+temp<- env %>% group_by(year, ptt, SO_startDOY, variable) %>% summarise(country=first(country))
+
+dat2$country<-temp$country
+
+dat2[which(dat2$precip>500),]$precip<-0 # remove erroneous vals
+dat2[which(is.na(dat2$precip)),]$precip<-0 # fix na
+
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(cumrf=cumsum(precip))
+
+# for tamsat cumrf
+dat2<-dplyr::arrange(dat2, ptt, year, SO_startDOY, variable)
+dat2$tamRAIN[which(!(1:21375 %in% seq(5,21375, 5)))]<-0
+dat2<-dat2 %>% group_by(year, ptt, SO_startDOY) %>% dplyr::mutate(tamcumrf=cumsum(tamRAIN))
+
+
+### visualisastion  
+
+
+for(i in 1:nrow(dat))
+{
+  dtemp<-dat[i,]
+
+  if(is.na(dtemp$DEPwestAF)){next}
+  
+t2<-dat2[dat2$ptt==dtemp$ptt & dat2$year==dtemp$year,]
+  
+temp=ggplot(data=t2)+
+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
+
+  geom_line( aes(x=variable, y=emodisNDVI*500), colour='dark green')+
+   
+    geom_line( aes(x=variable, y=emodisANOM*1000+200), colour='purple', linetype=2)+
+  geom_line( aes(x=variable, y=tamRAINanom+200), colour='dark blue', linetype=2)+
+  geom_hline(yintercept=200)+
+    geom_line(aes(x=variable, y=cumrf), col='blue', size=1)+
+  geom_line(aes(x=variable, y=tamcumrf), col='cyan', size=1)+
+  facet_wrap(~SO_startDOY+country)+theme_classic()+
+  ylab('cumulative rainfall since 01 Jan (mm)')+ xlab('Day of year')+
+          ggtitle(paste("PTT:", dtemp$ptt, "Year:",dtemp$year, "Dep WA:", dtemp$DEPwestAF))+ylim(c(0,500))
+
+# for lite version without:
+# geom_line( aes(x=variable, y=aquaANOM*1000+200), colour='pink', linetype=2)+
+#  geom_line( aes(x=variable, y=aquaNDVI*500), colour='green')+
+#
+#
+
+print(temp)
+
+}
+
+```
+
