@@ -102,3 +102,36 @@ b2<-batl[batl$tenkm%in%c_cells$TQ42,]
 
 write.csv(b2, 'C:/cuckoo_tracking/sourced_data/cuckoo_demography/Atlas_centroids_hewson_nature.csv', quote=F, row.names=F)
 
+
+# quick bit of analyses
+
+## extra section to filter to just birds used in spring analyses
+dmod<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+
+dmod$breeding_loc<-as.character(dmod$breeding_loc)
+dmod[dmod$ptt==128300,]$breeding_loc<-'Kinloch Skye'
+dmod[dmod$breeding_loc=='Scotland',]$breeding_loc<-'Trossachs'
+
+pop_trend<-site_dem %>% group_by(tagloc) %>% 
+  summarise(mean_diff=mean(diff), sd_diff=sd(diff))
+
+pop_trend$tagloc<-recode(pop_trend$tagloc,
+                         'Ashdown For'='Ashdown Forest',
+                         'Lak District'='Lake District',
+                         'N York Moors' = 'North York Moors',
+                         'Norfolk Br'= 'Norfolk Broads',
+                         'Sherwood For'='Sherwood Forest',
+                         'Thetford For'='Thetford Forest')
+
+dmod<-left_join(dmod, pop_trend, by=c('breeding_loc'='tagloc'))
+# warning ok
+
+qplot(data=dmod, y=arrive_breeding, x=mean_diff, colour=breeding_loc)
+
+d2<-dmod %>% group_by(breeding_loc) %>% summarise_all(mean, na.rm=T)
+
+
+ggplot(data=d2, aes(y=arrive_uk, x=mean_diff))+
+  geom_point(aes(colour=breeding_loc), shape=2, size=2)+
+  geom_point(data=dmod ,aes(colour=breeding_loc), alpha=0.2)
+
