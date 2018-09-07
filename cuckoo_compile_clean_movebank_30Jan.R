@@ -537,3 +537,22 @@ writeOGR(obj=out_line, dsn="spatial",
          overwrite_layer = T)
 
 
+## Additional code to make spring migration only lines
+
+library(dplyr)
+library(sf)
+
+dat<-read.csv("C:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_2018_clean_stopovers_recalc.csv", h=T)
+
+dmod<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+
+dat$pttyear<-paste(dat$ptt, dat$year.x)
+dmod$pttyear<-paste(dmod$ptt, dmod$year)
+
+dat<-dat %>% filter(pttyear %in% unique(dmod$pttyear) & julian<145)
+
+dat_sp<-st_as_sf(dat, coords = c("long","lat"), crs="+proj=longlat +datum=WGS84")
+dat_ls<-dat_sp %>% group_by(pttyear) %>% summarise(do_union=F) %>% st_cast("LINESTRING")
+
+st_write(dat_ls, "C:/cuckoo_tracking/data/spatial/spring_lines.shp")
+
