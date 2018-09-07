@@ -577,8 +577,3 @@ grid.arrange(p1, p2, p3, p4, p5, p6, ncol=1, nrow=6)
 
 dev.off()
 
-
-## bit of code for monsoon arrival
-
-ggplot(data=dat2.1, aes(x=SO_median_long, y=SO_median_lat))+scale_colour_gradientn(colours=topo.colors(10))+facet_wrap(~year)+geom_point(aes(colour=monsarrDOY))+theme_bw()
-
