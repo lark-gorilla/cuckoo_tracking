@@ -97,9 +97,20 @@ geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
 #
 #
 
+
+#make epic plot
+#ggplot(data=t2)+
+#    geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, #ymax=500), fill='grey')+
+#    geom_line( aes(x=variable, y=emodisNDVI*500), colour='light #green', size=1)+
+#    geom_line(aes(x=variable, y=cumrf), col='blue', size=1)+
+#    facet_wrap(~country, ncol=1)+theme_classic()+
+#    ylab('Cumulative rainfall since 01 Jan (mm)')+ xlab('Day of #year')+
+#  scale_y_continuous(limits=c(0,500),sec.axis = #sec_axis(~./500, name='NDVI'))
+
 print(temp)
 
 }
 
 ```
+
 
