@@ -65,16 +65,30 @@ dmod<-dmod[,c(1:10,20,28)]
 
 dmod<-left_join(dmod, dp1[,1:4], by=c('ptt', 'year'='year.x'))
 
-## subset and join for depart Central Africa
+## subset and join for depart Central Africa (basically arrival in West Africa)
 
 dp1<-bodpoints_sp_ext %>% as_tibble() %>%
   filter(NAME %in% c("Togo","Cote d'Ivoire","Ghana",
                      "Nigeria","Burkina Faso", "Guinea",
-                     "Sierra Leone", "Liberia")) %>%
+                     "Sierra Leone","Benin", "Liberia", "Senegal")) %>%
   group_by(ptt, year.x) %>%
   summarise_all(first)
 
 dp1<-rename(dp1, DEPcentralAF2=julian, DEPcentralAF2county=NAME)
+
+dmod<-left_join(dmod, dp1[,1:4], by=c('ptt', 'year'='year.x'))
+
+## subset and join for depart Central Africa
+
+dp1<-bodpoints_sp_ext %>% as_tibble() %>%
+  filter(NAME %in% c("Congo","Cameroon",
+                     "Central African Republic",
+                     "Democratic Republic of the Congo",
+                     "Angola", "Gabon", "Equatorial Guinea")) %>%
+  group_by(ptt, year.x) %>%
+  summarise_all(last)
+
+dp1<-rename(dp1, DEPcentralAF3=julian, DEPcentralAF3county=NAME)
 
 dmod<-left_join(dmod, dp1[,1:4], by=c('ptt', 'year'='year.x'))
 
@@ -183,7 +197,7 @@ d3$SO_month<-NULL
 d2$dead<-0
 d3$dead<-1
 
-dater<-rbind(d2[,c(1:11,24)], d3[,1:12])
+dater<-rbind(d2[,c(1:11,22)], d3[,1:12])
 
 library(lubridate)
 
@@ -225,4 +239,68 @@ dmod$depart_winterSO2<-ifelse(dmod$depmidwint-dmod$DEPminlat>100,
 dmod$depart_winterSO2<-ifelse(dmod$depart_winterSO2>100,
                               dmod$depart_winterSO2-365,
                               dmod$depart_winterSO2)
+
+# Clean up depNorthAf2 for birds that first point after 
+# North Af is actually back in UK
+
+dmod[which(dmod$DEPnorthAF2county=='United Kingdom'),]$DEPnorthAF2<-NA
+
+#tidy dataset removing test columns and updating originals
+
+
+
+dmod$breeding_hab<-'Upland'
+dmod[dmod$breeding_loc %in%
+       c('Ashdown Forest', 'New Forest', 'Norfolk Broads',
+         'Sherwood Forest', 'Thetford Forest'),]$breeding_hab<-'Lowland'
+
+dmod$depart_winterSO<-dmod$depart_winterSO2
+dmod$DEPnorthAF<-dmod$DEPnorthAF2
+dmod$ARRwestAF<-dmod$DEPcentralAF2
+dmod$DEPcentralAF<-dmod$DEPcentralAF3
+
+dmod<-dmod[,c(1:5, 24, 6:11, 23)]
+
+# add mig route back in
+
+temp<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+
+# fix to remove duplicate Livingstone in new dataset
+
+dmod<-dmod[c(1:23, 25:nrow(dmod)),]
+
+# attrib migration
+dmod$autumn_mig<-temp$autumn_mig
+
+
+
+#write out
+
+write.csv(dmod, "C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_final.csv", quote=F, row.names=F)
+
+
+
+##############################
+## Job 2 run regressions and 
+## compare residuals to explain how different legs of the
+## journey incur variance in arrival time
+
+# note need to check NA values and if they are comparable?
+# do I need to run analyses on na.omit dataset?
+
+library(lmerTest) # internally calls lme4
+library(ggplot2)
+
+dmod<-read.csv("C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_final.csv", h=T)
+
+
+m1<-lmer(arrive_breeding~arrive_uk+(1|breeding_hab/ptt)+(1|year), data=dmod)
+m2<-lmer(arrive_breeding~DEPnorthAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
+m3<-lmer(arrive_breeding~DEPwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
+m4<-lmer(arrive_breeding~ARRwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
+m5<-lmer(arrive_breeding~DEPcentralAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
+m6<-lmer(arrive_breeding~depart_winterSO+(1|breeding_hab/ptt)+(1|year), data=dmod)
+
+anova(m1)
+
 
