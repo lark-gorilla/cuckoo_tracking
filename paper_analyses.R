@@ -257,7 +257,20 @@ dmod[dmod$breeding_loc %in%
 dmod$depart_winterSO<-dmod$depart_winterSO2
 dmod$DEPnorthAF<-dmod$DEPnorthAF2
 dmod$ARRwestAF<-dmod$DEPcentralAF2
-dmod$DEPcentralAF<-dmod$DEPcentralAF3
+
+# after reviewing the above extraction with best of day points we actually
+# revert to using the original data for departure from central Africa
+# for most points but some are still leaving erroneously early due to
+# recalc parameters attributing next point's time to end of stopver but
+# next point still being well within Central Africa. As a comprimise we
+# take the greatest value of the original method and new method which
+# sorts early and late errors.
+
+dmod$DEPcentralAF<-ifelse(dmod$DEPcentralAF3>dmod$DEPcentralAF,dmod$DEPcentralAF3, dmod$DEPcentralAF)
+
+# and edit to one bird
+dmod[28,]$DEPcentralAF<-88
+
 
 dmod<-dmod[,c(1:5, 24, 6:11, 23)]
 
@@ -280,6 +293,11 @@ dmod$DEPeurope<-NULL
 
 write.csv(dmod, "C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_final.csv", quote=F, row.names=F)
 
+# use previous modelready dataset to attrib env data to new dmod
+
+dmodA<-cbind(dmod, temp[,c(22:24,31:126)])
+
+write.csv(dmodA, "C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready_final.csv", quote=F, row.names=F)
 
 
 ##############################
@@ -299,7 +317,7 @@ dmod<-read.csv("C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_s
 m1<-lmer(arrive_breeding~arrive_uk+(1|breeding_hab/ptt)+(1|year), data=dmod)
 m2<-lmer(arrive_breeding~DEPnorthAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
 m3<-lmer(arrive_breeding~DEPwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
-m4<-lmer(arrive_breeding~ARRwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
+
 m5<-lmer(arrive_breeding~DEPcentralAF+(1|breeding_hab/ptt)+(1|year), data=dmod)
 m6<-lmer(arrive_breeding~depart_winterSO+(1|breeding_hab/ptt)+(1|year), data=dmod)
 
@@ -311,8 +329,6 @@ dfresid<-rbind(data.frame(residuals=resid(m1, type='pearson'),
                           mig_region='Europe arrive'), 
                data.frame(residuals=resid(m3, type='pearson'),
                           mig_region='West Africa depart'), 
-               data.frame(residuals=resid(m4, type='pearson'),
-                          mig_region='West Africa arrive'), 
                data.frame(residuals=resid(m5, type='pearson'),
                           mig_region='Central Africa depart'), 
                data.frame(residuals=resid(m6, type='pearson'),
@@ -332,14 +348,19 @@ dmod_nona<-na.omit(dmod)
 m1<-lmer(arrive_breeding~arrive_uk+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
 m2<-lmer(arrive_breeding~DEPnorthAF+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
 m3<-lmer(arrive_breeding~DEPwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
-m4<-lmer(arrive_breeding~ARRwestAF+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
+
 m5<-lmer(arrive_breeding~DEPcentralAF+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
 m6<-lmer(arrive_breeding~depart_winterSO+(1|breeding_hab/ptt)+(1|year), data=dmod_nona)
 
 #make predictions and plots
 
-newdat<-data.frame(arrive_uk=min(dmod_nona$arrive_uk):max(dmod_nona$arrive_uk), arrive_breeding=1)
-newdat$p1<-predict(m1, newdata=newdat, re.form=~0)
+newdat<-expand.grid(arrive_uk=min(dmod_nona$arrive_uk):max(dmod_nona$arrive_uk),
+                   arrive_breeding=1, 
+                   year=2012:2018,
+                   ptt=unique(dmod_nona$ptt), 
+                   breeding_hab=c('Lowland', 'Upland'))
+
+newdat$p1<-predict(m1, newdata=newdat, re.form=~(1|breeding_hab))
 predmat<-model.matrix(arrive_breeding~arrive_uk, data=newdat)
 vcv<-vcov(m1)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
@@ -348,8 +369,12 @@ newdat$uc<-newdat$p1+semod*1.96
 newdat$mod='UK_arrive'
 m1dat<-newdat
 
-newdat<-data.frame(DEPnorthAF=min(dmod_nona$DEPnorthAF):max(dmod_nona$DEPnorthAF), arrive_breeding=1)
-newdat$p1<-predict(m2, newdata=newdat, re.form=~0)
+newdat<-expand.grid(DEPnorthAF=min(dmod_nona$DEPnorthAF):max(dmod_nona$DEPnorthAF),
+                    arrive_breeding=1, 
+                    year=2012:2018,
+                    ptt=unique(dmod_nona$ptt), 
+                    breeding_hab=c('Lowland', 'Upland'))
+newdat$p1<-predict(m2, newdata=newdat, re.form=~(1|breeding_hab))
 predmat<-model.matrix(arrive_breeding~DEPnorthAF, data=newdat)
 vcv<-vcov(m2)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
@@ -358,8 +383,12 @@ newdat$uc<-newdat$p1+semod*1.96
 newdat$mod='Europe_arrive'
 m2dat<-newdat
 
-newdat<-data.frame(DEPwestAF=min(dmod_nona$DEPwestAF):max(dmod_nona$DEPwestAF), arrive_breeding=1)
-newdat$p1<-predict(m3, newdata=newdat, re.form=~0)
+newdat<-expand.grid(DEPwestAF=min(dmod_nona$DEPwestAF):max(dmod_nona$DEPwestAF),
+                    arrive_breeding=1, 
+                    year=2012:2018,
+                    ptt=unique(dmod_nona$ptt), 
+                    breeding_hab=c('Lowland', 'Upland'))
+newdat$p1<-predict(m3, newdata=newdat, re.form=~(1|breeding_hab))
 predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
 vcv<-vcov(m3)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
@@ -368,18 +397,12 @@ newdat$uc<-newdat$p1+semod*1.96
 newdat$mod='WestAfrica_depart'
 m3dat<-newdat
 
-newdat<-data.frame(ARRwestAF=min(dmod_nona$ARRwestAF):max(dmod_nona$ARRwestAF), arrive_breeding=1)
-newdat$p1<-predict(m4, newdata=newdat, re.form=~0)
-predmat<-model.matrix(arrive_breeding~ARRwestAF, data=newdat)
-vcv<-vcov(m4)
-semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
-newdat$lc<-newdat$p1-semod*1.96
-newdat$uc<-newdat$p1+semod*1.96
-newdat$mod='WestAfrica_arrive'
-m4dat<-newdat
-
-newdat<-data.frame(DEPcentralAF=min(dmod_nona$DEPcentralAF):max(dmod_nona$DEPcentralAF), arrive_breeding=1)
-newdat$p1<-predict(m5, newdata=newdat, re.form=~0)
+newdat<-expand.grid(DEPcentralAF=min(dmod_nona$DEPcentralAF):max(dmod_nona$DEPcentralAF),
+                    arrive_breeding=1, 
+                    year=2012:2018,
+                    ptt=unique(dmod_nona$ptt), 
+                    breeding_hab=c('Lowland', 'Upland'))
+newdat$p1<-predict(m5, newdata=newdat, re.form=~(1|breeding_hab))
 predmat<-model.matrix(arrive_breeding~DEPcentralAF, data=newdat)
 vcv<-vcov(m5)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
@@ -388,41 +411,47 @@ newdat$uc<-newdat$p1+semod*1.96
 newdat$mod='CentralAfrica_depart'
 m5dat<-newdat
 
-newdat<-data.frame(depart_winterSO=min(dmod_nona$depart_winterSO):max(dmod_nona$depart_winterSO), arrive_breeding=1)
-newdat$p1<-predict(m6, newdata=newdat, re.form=~0)
+newdat<-expand.grid(depart_winterSO=min(dmod_nona$depart_winterSO):max(dmod_nona$depart_winterSO),
+                    arrive_breeding=1, 
+                    year=2012:2018,
+                    ptt=unique(dmod_nona$ptt), 
+                    breeding_hab=c('Lowland', 'Upland'))
+newdat$p1<-predict(m6, newdata=newdat, re.form=~(1|breeding_hab))
 predmat<-model.matrix(arrive_breeding~depart_winterSO, data=newdat)
 vcv<-vcov(m6)
-semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
-newdat$lc<-newdat$p1-semod*1.96
-newdat$uc<-newdat$p1+semod*1.96
+#semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
+
+# edit to remove CIs !!!!
+newdat$lc<-newdat$p1
+newdat$uc<-newdat$p1
 newdat$mod='Winter_depart'
 m6dat<-newdat
 
 library(reshape2)
-pt_dat<-melt(dmod_nona[,c(1,2,4:10)], id.vars=c('arrive_breeding', 'ptt', 'year'))
+pt_dat<-melt(dmod_nona[,c(1,2,4,5,7:10)], id.vars=c('arrive_breeding', 'ptt', 'year'))
 
 names(m1dat)[1]<-'doy'
 names(m2dat)[1]<-'doy'
 names(m3dat)[1]<-'doy'
-names(m4dat)[1]<-'doy'
+
 names(m5dat)[1]<-'doy'
 names(m6dat)[1]<-'doy'
 
-pred_dat<-rbind(m1dat, m2dat, m3dat, m4dat, m5dat, m6dat)
+pred_dat<-rbind(m1dat, m2dat, m3dat, m5dat, m6dat)
 
-pred_dat$mod<-factor(pred_dat$mod, levels=c("Winter_depart", "CentralAfrica_depart","WestAfrica_arrive", 
+pred_dat$mod<-factor(pred_dat$mod, levels=c("Winter_depart", "CentralAfrica_depart",
                                             "WestAfrica_depart",  "Europe_arrive", "UK_arrive" ))  
 names(pt_dat)[4]<-'mod'
 pt_dat$mod<-as.character(pt_dat$mod)
 
 pt_dat[pt_dat$mod=='depart_winterSO',]$mod<-'Winter_depart'
 pt_dat[pt_dat$mod=='DEPcentralAF',]$mod<-'CentralAfrica_depart'
-pt_dat[pt_dat$mod=='ARRwestAF',]$mod<-'WestAfrica_arrive'
+
 pt_dat[pt_dat$mod=='DEPwestAF',]$mod<-'WestAfrica_depart'
 pt_dat[pt_dat$mod=='DEPnorthAF',]$mod<-'Europe_arrive'
 pt_dat[pt_dat$mod=='arrive_uk',]$mod<-'UK_arrive'
 
-pt_dat$mod<-factor(pt_dat$mod, levels=c("Winter_depart", "CentralAfrica_depart","WestAfrica_arrive", 
+pt_dat$mod<-factor(pt_dat$mod, levels=c("Winter_depart", "CentralAfrica_depart", 
                                             "WestAfrica_depart",  "Europe_arrive", "UK_arrive" ))  
 
 
@@ -436,16 +465,34 @@ ggplot()+geom_point(data=pt_dat, aes(x=value, y=arrive_breeding, colour=paste(pt
   theme_bw()+facet_wrap(~mod, scales='free')
 
 
-ggplot()+geom_point(data=pt_dat, aes(x=value, y=arrive_breeding, colour=mod))+
-  geom_line(data=pred_dat, aes(x=doy, y=p1, colour=mod))+
-  geom_line(data=pred_dat, aes(x=doy, y=lc, colour=mod), linetype='dashed')+
-  geom_line(data=pred_dat, aes(x=doy, y=uc, colour=mod), linetype='dashed')+
-  labs(x="Day of Year", y="Arrival at breeding grounds (DOY)", colour='Region')+
+ggplot()+geom_point(data=pt_dat, aes(x=value, y=arrive_breeding))+
+  geom_line(data=pred_dat, aes(x=doy, y=p1, colour=breeding_hab))+
+  geom_line(data=pred_dat, aes(x=doy, y=lc, colour=breeding_hab), linetype='dashed')+
+  geom_line(data=pred_dat, aes(x=doy, y=uc, colour=breeding_hab), linetype='dashed')+
+  labs(x="Day of Year", y="Arrival at breeding grounds (DOY)")+
   theme_bw()+facet_wrap(~mod, scales='free')
 
 library(MuMIn)
-r.squaredGLMM(m1);r.squaredGLMM(m2);r.squaredGLMM(m3)
-r.squaredGLMM(m4);r.squaredGLMM(m5);r.squaredGLMM(m6)
+
+r.squaredGLMM(m1)
+r.squaredGLMM(m2)
+r.squaredGLMM(m3)
+r.squaredGLMM(m5)
+r.squaredGLMM(m6)
+
+#just little idea to see if explanatory power is a simple function of time
+# or actually per region
+
+lin_r2<-seq(0.07,0.88, length.out=120)
+
+median(dmod$DEPcentralAF, na.rm=T)
+lin_r2[70]
+
+median(dmod$DEPwestAF, na.rm=T)
+lin_r2[102]
+
+median(dmod$DEPnorthAF, na.rm=T)
+lin_r2[107]
 
 
 ## Comparison of residuals to attribute certain regions where variance 
@@ -455,7 +502,6 @@ r.squaredGLMM(m4);r.squaredGLMM(m5);r.squaredGLMM(m6)
 dmod_nona$r.arriveUK<-resid(m1, type='pearson')
 dmod_nona$r.arriveEU<-resid(m2, type='pearson')
 dmod_nona$r.departWA<-resid(m3, type='pearson')
-dmod_nona$r.arriveWA<-resid(m4, type='pearson')
 dmod_nona$r.departCA<-resid(m5, type='pearson')
 dmod_nona$r.departWI<-resid(m6, type='pearson')
 
@@ -464,9 +510,58 @@ dmod_nona$r.departWI<-resid(m6, type='pearson')
 dmod_nona$var.UK<-dmod_nona$r.arriveUK
 dmod_nona$var.europe<-dmod_nona$r.arriveEU-dmod_nona$r.arriveUK
 dmod_nona$var.Sahara<-dmod_nona$r.departWA-dmod_nona$r.arriveEU
-dmod_nona$var.Wafrica<-dmod_nona$r.departWA-dmod_nona$r.arriveEU
-dmod_nona$var.Cafrica<-dmod_nona$r.departWA-dmod_nona$r.arriveEU
+dmod_nona$var.Wafrica<-dmod_nona$r.departCA-dmod_nona$r.departWA
+dmod_nona$var.Cafrica<-dmod_nona$r.departWI-dmod_nona$r.departCA
+
+var_yr<-melt(dmod_nona[,c(2,19:23)], id.vars=c('year'))
+
+qplot(data=var_yr, x=variable, y=value, colour=factor(year), geom='boxplot')
+
+qplot(data=var_yr, x=variable, y=value)+facet_wrap(~year)
+# but year is in models
+# so plot RFEs
+
+### Run investigation of env impacts on W Africa departure date
+## as per discussion with James
+
+modenv<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready_final.csv', h=T)
 
 
+m1<-lmer(DEPwestAF~DEPcentralAF+monsTarr_mean+
+           (1|breeding_hab/ptt)+(1|year), data=modenv)
+
+plot(m1)
+summary(m1)
+anova(m1)
+
+qplot(data=modenv, x=monsTarr_mean, y=DEPwestAF)
+
+#better with first rains
+
+m1<-lmer(DEPwestAF~DEPcentralAF+monsTarr_first+
+           (1|breeding_hab/ptt)+(1|year), data=modenv)
+
+plot(m1)
+summary(m1)
+anova(m1)
+
+qplot(data=modenv, x=monsTarr_mean, y=DEPwestAF)
 
 
+## using dmod_nona data to explain variance in migration speed
+## for various migration regions
+
+mm1<-lm(var.Sahara~monsTarr_first, data=dmod_nona)
+
+plot(mm1)
+summary(mm1)
+anova(mm1)
+
+qplot(data=dmod_nona, y=var.Sahara+var.europe, x=emodisNDVI_mean)
+
+
+mm1<-lm(var.Sahara+var.europe~emodisNDVI_mean, data=dmod_nona)
+
+summary(mm1)
+anova(mm1)
+#hmm
