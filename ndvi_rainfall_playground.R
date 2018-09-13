@@ -73,6 +73,8 @@ dat<-left_join(dat, soversWA %>%
 
 dat$dur_finalSO=dat$DEPwestAF-dat$st_finalSO
 
+# quick bit of exploratory analyses
+
 # explaining departure rate using depature staging grounds
 
 # factor 1: arrival time at departure grounds dictates departure 
@@ -115,7 +117,7 @@ ggplot(data=dat, aes(x=factor(year), y=departureGarr))+geom_boxplot()+
   geom_boxplot(aes(y=rainarrDOY), col=2)
 
 
-#### AND THE ENV DATA #####
+#### Attribute THE ENV DATA #####
 
 env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
 
@@ -173,13 +175,17 @@ for(i in 1:nrow(dat2.1))
   print(i)
   }
 
+# date of arrival of phenomena
+dat2.1$rainTarr=dat2.2$variable
+dat2.1$ndviTarr=dat2.3$variable
+dat2.1$monsTarr=dat2.3a$variable
 
+# time difference between bird arrival and arrival of phenomena
 dat2.1$rainTdiff=dat2.1$variable-dat2.2$variable
-
 dat2.1$ndviTdiff=dat2.1$variable-dat2.3$variable
-
 dat2.1$monsTdiff=dat2.1$variable-dat2.3a$variable
 
+# magnitude of variable difference between bird arrival and arrival of phenomena
 dat2.1$raindiff=dat2.1$cumrf-dat2.2$cumrf
 dat2.1$raindiff2=dat2.1$tamcumrf-dat2.2$tamcumrf
 dat2.1$monsdiff=dat2.1$cumrf-dat2.3a$cumrf
@@ -220,16 +226,17 @@ dat$year<-as.integer(dat$year)
 
 ## join em up 
 
-dat3.1<-left_join(dat, dat2.4a[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
+dat3.1<-left_join(dat, dat2.4a[,c(1,2,16,17,19:40)], by=c('ptt', 'year'))
 
-names(dat3.1)[31:51]<-paste(names(dat3.1)[31:51],'first', sep='_')
+names(dat3.1)[31:54]<-paste(names(dat3.1)[31:54],'first', sep='_')
 
-dat3<-left_join(dat3.1, dat2.4[,c(1,2,16,17,19:37)], by=c('ptt', 'year'))
+dat3<-left_join(dat3.1, dat2.4[,c(1,2,16,17,19:40)], by=c('ptt', 'year'))
 
-names(dat3)[52:72]<-paste(names(dat3)[52:72],'last', sep='_')
+names(dat3)[55:78]<-paste(names(dat3)[55:78],'last', sep='_')
 
-dat4<-left_join(dat3, dat2.5[,c(1,2,16:36, 50:70)], by=c('ptt', 'year'))
+dat4<-left_join(dat3, dat2.5[,c(1,2,16:39, 53:76)], by=c('ptt', 'year'))
 
+#write out
 #write.csv(dat4, 'C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', quote=F, row.names=F)
 
 ######### now ready to model! - in next script ###############
