@@ -2,7 +2,9 @@
 title: "Paper Wireframe"
 author: "Mark Miller"
 date: "10 July 2018"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -27,21 +29,21 @@ library('dplyr')
 
 if(Sys.info()['nodename']=="D9L5812"){
   setwd("C:/cuckoo_tracking")}else{
-    setwd("N:/cuckoo_tracking")}
+    setwd("~/BTO/cuckoo_tracking")}
 
 #summary data
-dat<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
+dat<- read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv', h=T)
 
 #stopover coord data (median points)
-sovers<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv', h=T)
+sovers<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv', h=T)
 
 
 ## landcover and river data
-lc<-read.csv("C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", h=T)
+lc<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", h=T)
 
 #extra data for filling migratory route
 
-extraz<- read.csv('C:/cuckoo_tracking/data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv', h=T)
+extraz<- read.csv('data/stopover_bestofday_1daymin_recalc_spring_mig_summary_extras.csv', h=T)
 
 #### Data cleaning
 
@@ -101,7 +103,7 @@ dat<-left_join(dat, (lc1 %>% group_by(ptt, year) %>% dplyr::summarise_all(last))
 
 #### AND THE ENV DATA #####
 
-env<-read.csv('C:/cuckoo_tracking/data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
+env<-read.csv('data/spring_rainfall_NDVI_GRIMMS_TAMSAT_emodis_by_stopover_detailcoords_2018_dead.csv', h=T)
 
 names(env)[names(env)=='value']<-'precip'
 names(env)[names(env)=='value2']<-'ndvi'
@@ -135,7 +137,7 @@ dat2.2<-dat2.1 %>% group_by(year, ptt, SO_startDOY) %>%
 
 # read in model-ready dataset
 
-dmod<-read.csv('C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
+dmod<-read.csv('data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_attrib_modelready.csv', h=T)
 
 dmod$tWA=dmod$DEPwestAF-dmod$departureGarr
 
@@ -263,22 +265,6 @@ qplot(data=d1, x=depart.west.africa, y=migration.length)+
 Explore the dataset. Each point gives the final stopover in West Africa before migration. Colours denote different years.
 
 
-```{r, warning=F, message=F, echo=F} 
-
-dat_sp<-st_as_sf(na.omit(dat[,c(1,2,6,23,24)]), coords = c("dep_long","dep_lat"), crs="+proj=longlat +datum=WGS84")
-
-dat_sp$year<-factor(dat_sp$year)
-
-pal <- colorFactor(c("navy", "blue", 'cyan', 'green', 'yellow', 'orange', 'red'), domain = c("2012", "2013", '2014', '2015', '2016', '2017', '2018'))
-
-m <- leaflet(dat_sp) %>%
-  addTiles() %>% 
-  addCircleMarkers( popup= paste("ptt:", dat_sp$ptt, "<br>", "year:", dat_sp$year,"<br>", "Departure date:", dat_sp$DEPwestAF), color=~pal(year), stroke=F, radius=6, fillOpacity = 0.5)
-   
-m           
-
-``` 
- 
 
 ### Q2)
 
@@ -429,7 +415,7 @@ ggplot() + geom_polygon(data = map,
 A final test if to see if dates of arrival into the UK or departure from West Africa are related to population declines. The number of tagging sites gives good spatial coverage over the UK. Number of Bird Atlas cells attributed to each population are defined based on tagging locations as per Hewson nature paper.
 
 ```{r, warning=F, message=F, echo=F}
-setwd('C:/cuckoo_tracking/sourced_data')
+setwd('~/BTO/cuckoo_tracking/sourced_data')
 
 bat_site<-readOGR(layer='Atlas_tagging_areas_added_spring_birds', dsn='cuckoo_demography', verbose = FALSE)
 
@@ -741,148 +727,7 @@ ggplot() +
 
 ```
 
-Rather than looking at arrival of first rains we can concentrate on arrival of the monsoon, in particular its temporal and spatial variation. In the visualisation below we define monsoon arrival as the day of year when there has been cumulatively > 100ml of rain(we can modify this to any value) for each pixel. Turn of all the yearly tick boxes on the right then explore each year in turn to see temporal variation. Pan and zoom to explore spatial variation and how birds within each year time their stopovers to co-incide with arrival of monsoon. *Note how in 2016 rains are late across the entire region, but timing of departures from West Africa do not seem to be affected*
 
-```{r, warning=F, message=F, echo=F} 
- 
-r2012_mon<-raster('C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2012.tif')
-r2013_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2013.tif')
-r2014_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2014.tif')
-r2015_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2015.tif')
-r2016_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2016.tif')
-r2017_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2017.tif')
-r2018_mon<-raster( 'C:/cuckoo_tracking/sourced_data/PERSIANN_rainfall/mons_arr2018.tif')
-
-
-setwd('C:/cuckoo_tracking/sourced_data')
-
-wrld<-readOGR(layer='TM_WORLD_BORDERS-0.3', dsn='country_borders', verbose = FALSE)
-
-
-dat$year<-as.integer(dat$year)
- soversWA1<-left_join(soversWA, dat[,c(1,2,6)], by=c('ptt', 'year'))
- 
- forsp<-na.omit(soversWA1[,c(1,2,7,8,9,17,18,22)])
- forsp<-forsp %>% group_by(ptt, year) %>% mutate(nzz=n()) %>% filter(nzz>1) # drops Peckham in 2016 that cocks up linestring
- dat_sp<-st_as_sf(forsp, coords = c("SO_median_long","SO_median_lat"), crs="+proj=longlat +datum=WGS84")
- dat_ls<-dat_sp %>% group_by(ptt, year, DEPwestAF) %>% summarise(do_union=F) %>% st_cast("LINESTRING")
- #dat_ls
- #setwd('C:/cuckoo_tracking/data/spatial');st_write(dat_ls,'spring_linesWA.shp')
-
-pal <- colorBin(c('#9e0142','#d53e4f','#f46d43','#fdae61','#fee08b','#e6f598','#abdda4','#66c2a5','#3288bd','#5e4fa2'), c(NA, 0:125), na.color = "transparent")
-
- m <- leaflet() %>%
-  addTiles() %>% 
-   
-  addRasterImage(r2012_mon, colors = pal, opacity = 0.8, group='2012') %>%
-     addRasterImage(r2013_mon, colors = pal, opacity = 0.8, group='2013') %>%
-     addRasterImage(r2014_mon, colors = pal, opacity = 0.8, group='2014') %>%
-     addRasterImage(r2015_mon, colors = pal, opacity = 0.8, group='2015') %>%
-     addRasterImage(r2016_mon, colors = pal, opacity = 0.8, group='2016') %>%
-     addRasterImage(r2017_mon, colors = pal, opacity = 0.8, group='2017') %>%
-     addRasterImage(r2018_mon, colors = pal, opacity = 0.8, group='2018') %>%
-   addLegend(pal = pal, values = c(NA, 0:125),
-    title = "Monsoon arrival day") %>%
-   
-   addPolylines(data=wrld[wrld$REGION==2,], color=1, weight=2, opacity=1) %>%
-  
-  
-  addPolylines(data=dat_ls[dat_ls$year==2012,], weight=1, color=1, group='2012', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2012,], popup= paste("ptt:", dat_sp[dat_sp$year==2012,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2012,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2012,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2012,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2012') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2013,], weight=1, color=1, group='2013', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2013,], popup= paste("ptt:", dat_sp[dat_sp$year==2013,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2013,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2013,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2013,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2013') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2014,], weight=1, color=1, group='2014', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2014,], popup= paste("ptt:", dat_sp[dat_sp$year==2014,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2014,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2014,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2014,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2014') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2015,], weight=1, color=1, group='2015', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2015,], popup= paste("ptt:", dat_sp[dat_sp$year==2015,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2015,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2015,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2015,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2015') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2016,], weight=1, color=1, group='2016', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2016,], popup= paste("ptt:", dat_sp[dat_sp$year==2016,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2016,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2016,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2016,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2016') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2017,], weight=1, color=1, group='2017', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2017,], popup= paste("ptt:", dat_sp[dat_sp$year==2017,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2017,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2017,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2017,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2017') %>%
-   
-     addPolylines(data=dat_ls[dat_ls$year==2018,], weight=1, color=1, group='2018', dashArray='4,2') %>%
-
-  addCircleMarkers(data=dat_sp[dat_sp$year==2018,], popup= paste("ptt:", dat_sp[dat_sp$year==2018,]$ptt, "<br>", "name:", dat_sp[dat_sp$year==2018,]$name,"<br>", "SO start:", dat_sp[dat_sp$year==2018,]$SO_startDOY,"<br>", "depart WA:", dat_sp[dat_sp$year==2018,]$DEPwestAF), color='#219607', stroke=T, radius=3, group='2018') %>%
-   
-   
-     addLayersControl(overlayGroups = c('2012', '2013', '2014', '2015', '2016', '2017', '2018'), options=layersControlOptions(collapsed=F))
-   
-m
-
-```
-
-OK so are there any explanatory environmental variables that can explain the variation in cuckoo departure from West Africa
-
-```{r, warning=F, message=F, echo=F} 
- # make two gradient metrics
- dmod$ndvi_last_ang<-dmod$ndviTdiff_last*dmod$ndvidiff_last
-dmod$rain_first_ang<-(dmod$monsTdiff_first+25)*dmod$raindiff2_first
- m0<-lmer(DEPwestAF~(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m1<-lmer(DEPwestAF~dep_country+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m2<-lmer(DEPwestAF~firstCdepartureG+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m3<-lmer(DEPwestAF~departureGarr+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m4<-lmer(DEPwestAF~nSOdepartureG+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m5<-lmer(DEPwestAF~monsTdiff_first+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m6<-lmer(DEPwestAF~raindiff2_first+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m7<-lmer(DEPwestAF~emodisNDVI_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m8<-lmer(DEPwestAF~ndviTdiff_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m9<-lmer(DEPwestAF~ndvidiff_last+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m10<-lmer(DEPwestAF~emodisANOM_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m11<-lmer(DEPwestAF~Trees_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m12<-lmer(DEPwestAF~Croplands_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
-m13<-lmer(DEPwestAF~d_river_mean+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
- m14<-lmer(DEPwestAF~rain_first_ang+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
- m15<-lmer(DEPwestAF~ndvi_last_ang+(1|ptt)+(1|year), data=dmod[dmod$DEPwestAF %in% 85:120,])
- anova(m0,m1,m2,m3,m4,m5,m6,m7,m8,m9,m10, m11, m12,m13, m14, m15)
- moddat<-dmod[dmod$DEPwestAF %in% 85:120,]
- mfin<-lmer(DEPwestAF~departureGarr+nSOdepartureG+monsTdiff_first*raindiff2_first+emodisNDVI_last+ndviTdiff_last*ndvidiff_last+emodisANOM_mean+Trees_mean+Croplands_mean+d_river_mean+(1|ptt)+(1|year), data=moddat,  na.action = na.fail)
- mdr<-dredge(mfin)
- get.models(mdr, subset = delta < 4, method = "REML")
- #qplot(data=dmod[dmod$DEPwestAF %in% 85:120,], y=DEPwestAF, x=nSOdepartureG)
- #qplot(data=dmod[dmod$DEPwestAF %in% 85:120,], y=DEPwestAF, x=ndviTdiff_last)
- #qplot(data=dmod[dmod$DEPwestAF %in% 85:120 & dmod$emodisANOM_mean>-0.05,], y=DEPwestAF, x=emodisANOM_mean)
-```
- 
- So what do these early leaving birds do in their runup to departing Cote d'Ivoire that is different to other birds? The tracks of early departing birds are grouped with blue lines and late departing with orange lines. Each stopover is coloured either red (indicating below average NDVI) or green (above average NDVI) to see if early birds chain together 'greener stopovers.
- 
-```{r, warning=F, message=F, echo=F} 
- dat$year<-as.integer(dat$year)
- soversWA1<-left_join(soversWA, dat[,c(1,2,6)], by=c('ptt', 'year'))
- soversWA2<-left_join(soversWA1, dat2.2[,c(1,2, 3,9)], by=c('ptt', 'year', 'SO_startDOY'))
- forsp<-na.omit(soversWA2[,c(1,2,7,8,9,17,18,22,23)])
- forsp<-forsp %>% group_by(ptt, year) %>% mutate(nzz=n()) %>% filter(nzz>1) # drops Peckham in 2016 that cocks up linestring
- dat_sp<-st_as_sf(forsp, coords = c("SO_median_long","SO_median_lat"), crs="+proj=longlat +datum=WGS84")
- dat_ls<-dat_sp %>% group_by(ptt, year, DEPwestAF) %>% summarise(do_union=F) %>% st_cast("LINESTRING")
- #dat_ls
- #setwd('C:/cuckoo_tracking/data/spatial');st_write(dat_ls,'spring_linesWA.shp')
- d2<-dat_sp[dat_sp$DEPwestAF<101,]
-d3<-dat_sp[dat_sp$DEPwestAF>100,]
- m <- leaflet() %>%
-  addTiles() %>% 
-  
-  addPolylines(data=dat_ls[dat_ls$DEPwestAF<101,], weight=1, color='blue', group='Early departure') %>%
-  
-    addPolylines(data=dat_ls[dat_ls$DEPwestAF>100,], weight=1, color='orange', group='Late departure') %>%
-  
-  addCircleMarkers(data=d2, popup= paste("ptt:", d2$ptt, "<br>", "year:", d2$year,"<br>", "NDVIanom:", d2$aquaANOM), color=~ifelse(aquaANOM>0, 'green', 'red'), stroke=F, radius=5, opacity=0.2, group='Early departure') %>%
-  
-    addCircleMarkers(data=d3, popup= paste("ptt:", d3$ptt, "<br>", "year:", d3$year,"<br>", "NDVIanom:", d3$aquaANOM), color=~ifelse(aquaANOM>0, 'green', 'red'), stroke=F, radius=5,opacity=0.2, group='Late departure') %>%
-  
-  addLayersControl(overlayGroups = c('Early departure', 'Late departure'), options=layersControlOptions(collapsed=F))
-   
-m           
-``` 
 
 Habitat Variables
 Habitat of the final stopover before departure from West Africa does not seem to have a huge imapact.
