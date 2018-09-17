@@ -24,13 +24,14 @@ library(ggrepel)
 
 # using best of day data
 
-dat<-read.csv("~/BTO/cuckoo_tracking/data/stopover_bestofday_spring_mig.csv", h=T)
+dat<-read.csv("C:/cuckoo_tracking/data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", h=T)
 
 
-dat2<-read.csv("~/BTO/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_clean_stopovers.csv", h=T)
+dat2<-read.csv("C:/cuckoo_tracking/data/processed_movebank_cuckoos_hybrid_filter_2018_clean_stopovers_recalc.csv", h=T)
 
 
-UK_travel<-read.csv("~/BTO/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
+UK_travel<-read.csv("C:/cuckoo_tracking/data/complete_cycles_UK_all_timing.csv", h=T)
+
 
 UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
@@ -40,25 +41,27 @@ dat3<-dat2[dat2$key %in% unique(paste(UK_travel$ptt, UK_travel$year)),]
 
 dat3<-dat3[dat3$month<6,]
 
+names(dat3)[names(dat3)=='year.x']<-'year'
+
 m1 <- get_map(location = c(5, 30), zoom=4)
 
 
 for(i in unique(dat3$ptt))
 {
-  cols <- c("2012" = "red", "2013" = "blue", "2014" = "darkgreen", "2015" = "orange", "2016"= "cyan", "2017"= "black")
+  cols <- c("2012" = "red", "2013" = "blue", "2014" = "darkgreen", "2015" = "orange", "2016"= "cyan", "2017"= "black",
+            "2018"= "purple")
 
   
   g<-ggmap(m1)+
-    geom_path(data=dat3[dat3$ptt==i,], aes(x=long, y=lat,
-                                             colour=factor(year.x)))+
+    geom_path(data=dat3[dat3$ptt==i,], aes(x=long, y=lat,                                      colour=factor(year)))+
     geom_jitter(data=dat3[dat3$ptt==i,], aes(x=long, y=lat,
-                colour=factor(year.x)), shape=1, width = 0.5, height= 0.5)+ggtitle(i)+
+                colour=factor(year)), shape=1, width = 0.5, height= 0.5)+ggtitle(i)+
   
   geom_label_repel(data=dat[dat$ptt==i & dat$deployment_entry==FALSE,], aes(x=SO_median_long, y=SO_median_lat,
                 colour=factor(year), label=substr(SO_start, 6,10)))+
-  geom_label_repel(data=aggregate(year~breeding_entry, data=dat[dat$ptt==i & dat$deployment_entry==FALSE,], FUN=function(x){unique(x)})
+  geom_label_repel(data=aggregate(year~breeding_entry, data=dat[dat$ptt==i,], FUN=function(x){unique(x)})
                    , aes(x=-18, y=45,
-                colour=factor(year), label=unique(substr(breeding_entry, 6,10)))) + scale_colour_manual(values = cols) 
+                colour=factor(year), label=substr(breeding_entry, 6,10))) + scale_colour_manual(values = cols) 
   
   print(g)
  

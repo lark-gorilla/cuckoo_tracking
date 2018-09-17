@@ -1,0 +1,121 @@
+---
+title: "West Africa cuckoo stopover rainfall patterns"
+author: "Mark Miller"
+date: "17 April 2018"
+output: html_document
+---
+
+```{r cuckoos, echo=FALSE, message=F, warning=F, fig.height=12, fig.width=12}
+
+#### work around for different laptop/desktop directories ####
+#### !!!! RUN THIS !!!! ####
+ if(Sys.info()['nodename']=="D9L5812"){
+   setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
+
+
+int_out<-read.csv('data/spring_rainfall_NDVI_GRIMMS_TAMSAT_by_stopover_detailcoords_2018_dead.csv', h=T)
+
+dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
+
+lc<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords_landcov_ext_rivers.csv", h=T)
+
+
+
+### visualisastion  
+  
+library(ggplot2)
+library(dplyr)
+
+# order country factors by longitude
+
+int_out$country<-factor(int_out$country, levels= c("Angola", "Democratic Republic of the Congo",
+                                                   "Congo", "Gabon", "Central African Republic", 
+                                                   "Cameroon", "Nigeria", "Togo", "Burkina Faso",
+                                                   "Ghana", "Cote d'Ivoire", "Liberia", "Guinea", 
+                                                   "Sierra Leone"))
+int_out[is.na(int_out$value),]$value<-0
+
+
+for( i in 2012:2018)
+  {
+  int1<-int_out[int_out$year==i,]
+    
+  for(j in unique(int1$ptt))
+      {
+dtemp<-dat[dat$year==i & dat$ptt==j,]
+
+t1<-int_out[int_out$ptt==j & int_out$year==i,]
+
+#landcover metrics
+lc1<-lc[lc$ptt==j & lc$year==i,]
+
+lc1<-lc1 %>% group_by(SO_startDOY, country) %>% dplyr::summarise(Tree=mean(Trees, na.rm=T), Grass=mean(Grasslands, na.rm=T), Crops=mean(Croplands, na.rm=T), Shrub=mean(Shrubs, na.rm=T),Bare=mean(Bare.areas, na.rm=T), Urban=mean(Built.up.areas, na.rm=T),
+  Aquatic=mean(Aquatic.veg.reg.flooded, na.rm=T), Water=mean(Open.water, na.rm=T), D_riv=
+    mean(d_river), D_riv2=mean(d_river_str2))
+                                                        
+                                                             lc1[,3:10]<-round(lc1[,3:10]/rowSums(lc1[,3:10], na.rm=T) *100)                             
+
+
+lc1$label<-""   
+for(k in 1:nrow(lc1))
+{
+  lctemp<-lc1[k,3:10]
+  
+  lcouty<-NULL
+  for(l in which(!is.na(lctemp)))
+{
+  tempy<-paste(names(lctemp)[l], ": ", lctemp[l], "% \n", sep="")
+    lcouty<-paste(lcouty, tempy)
+}
+lcouty<-paste(lcouty, "D riv:", round(lc1[k,11]/1000,1), "km \n", "D riv2:", round(lc1[k,12]/1000,1), "km \n")
+  
+lc1[k,]$label<-lcouty
+  
+}                                                              
+                                                            
+
+t1.1<-t1 %>% group_by(ptt, year, SO_startDOY, variable) %>% dplyr:: summarise_if(is.numeric, mean, na.rm = TRUE)
+
+t1.2<-t1 %>% group_by(ptt, year, SO_startDOY, variable) %>% dplyr:: summarise_if(is.factor, first)
+
+t1.3<-cbind(t1.1, t1.2)
+  
+t2<-t1.3 %>% group_by(SO_startDOY, country) %>% dplyr::mutate(cumrf=cumsum(value))
+
+t2.tmcum<- t1.3 %>% group_by(ptt, year, SO_startDOY,country, key) %>% dplyr::summarise(tamRAIN=first(tamRAIN), variable=first(variable)) %>%
+  dplyr::mutate(cumrfTAM=cumsum(tamRAIN))
+
+temp=ggplot(data=t2,aes(x=variable, y=value))+
+geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=500), fill='grey')+
+    geom_line(data=t2, aes(x=variable, y=value2*500), colour='red')+
+  geom_line(data=t2, aes(x=variable, y=aquaNDVI*500), colour='cyan')+
+  geom_line(data=t2, aes(x=variable, y=terrNDVI*500), colour='orange')+
+    geom_line(data=t2, aes(x=variable, y=aquaANOM*1000+200), colour='cyan', linetype=2)+
+    geom_line(data=t2, aes(x=variable, y=terrANOM*1000+200), colour='orange', linetype=2)+
+  geom_line(data=t2, aes(x=variable, y=tamRAINanom+200), colour='dark green', linetype=2)+
+  geom_hline(yintercept=200)+
+  geom_bar(stat='identity', colour='black')+
+    geom_line(aes(y=cumrf), col='green', size=1)+
+  geom_line(data=t2.tmcum, aes(x=variable, y=cumrfTAM), col='dark green', size=1)+
+  facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
+  ylab('cumulative rainfall since 01 Jan (mm)')+ xlab('Day of year')+
+          ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", dtemp$arrive_breeding))+geom_label(data=lc1, aes(x=15, y=450, vjust=1,label=label), fill=NA)
+
+#"   Mig speed:", round(dtemp$m4c_resid, 2)
+
+print(temp)
+
+#temp=ggplot(data=t2,aes(x=variable, y=value))+
+#geom_rect(aes(xmin=SO_startDOY, xmax=SO_endDOY, ymin=0, ymax=50), #fill='grey')+
+#  geom_bar(stat='identity', colour='black')+
+#  geom_smooth(span=0.5, se=FALSE, linetype='dashed', col='red')+
+#  facet_wrap(~country+SO_startDOY, scales='free_y')+theme_classic()+
+#  ylab('daily rainfall (mm)')+ xlab('Day of year')+
+#          ggtitle(paste("Year:",i,"   PTT:", j, "   Arr date:", #dtemp$arrive_breeding, "   Mig speed:", round(dtemp$m4c_resid, 2)))
+
+  }
+}
+
+```
+

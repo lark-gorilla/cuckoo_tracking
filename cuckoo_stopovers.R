@@ -12,6 +12,9 @@ library(rgeos)
 library(maps)
 library(maptools)
 
+if(Sys.info()['nodename']=="D9L5812"){
+  setwd("C:/cuckoo_tracking")}else{
+    setwd("N:/cuckoo_tracking")}
 
 # Read in processed cuckoo data with stopover regions defined
 # using Sam & Jenni's code
@@ -49,9 +52,59 @@ g
 # Ok so lets build a loop that makes a convex hull around each group of stopover points
 # attributes will be: ptt, start timestamp, end timestamp, ndays, month, year
 
+
+## edit (14/06/18) hijack look to produce stopover polygons for
+## Spring stopovers only and for those birds selected in the analyses
+
+# first read in spring stopover data which has the median locations
+# of each stopover, we want to use these to select the actual best of day
+# stopover locations to make the polygons
+
+stopovers<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_2018_clean_stopovers_recalc.csv", h=T)
+
+#get median coord stopovers
+dat1<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", h=T)
+
+#and dead ones
+dat2<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv", h=T)
+
+dat2$biome1<-NULL
+dat2$biome2<-NULL
+
+dat1$dead=0
+dat2$dead=1
+
+dat<-rbind(dat1, dat2)
+
+#write.csv(dat, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_BOTH.csv", quote=F, row.names=F)
+
+#do subset using join
+
+#drop uneeded columns from stopopvers
+
+stopovers<-stopovers[,1:7]
+
+stopovers$id<-NULL
+stopovers$event.id<-NULL
+
+
+library(dplyr)
+
+substop<-inner_join(dat, stopovers, by=c('ptt', 'mgroup'))
+
+qplot(data=substop[substop$ptt=='62608' & substop$mgroup==13,],
+      x=long, y=lat)+geom_point(aes(x=SO_median_long, y=SO_median_lat), colour=2)
+# ok works
+
+# write out subset 
+
+write.csv(substop, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords.csv", quote=F, row.names=F)
+
+# do loop
+
 stopovers_spdf<-NULL
 
-birds<-unique(dat$ptt)
+birds<-unique(substop$ptt)
 
 for(i in birds)
   {
@@ -59,26 +112,35 @@ for(i in birds)
   # for each bird give the mgroups which are not migratory ones
   bird_spdf<-NULL
   
-  mgz<-na.omit(unique(dat[dat$ptt==i & dat$mtype!="M",]$mgroup))
+  mgz<-unique(substop[substop$ptt==i,]$mgroup)
   
   for (j in mgz)
       {
-      ptt_mgroup<-dat[dat$ptt==i & dat$mgroup==j,]
+      ptt_mgroup<-substop[substop$ptt==i & substop$mgroup==j,]
+      
+      ## !!! if only two points this adds a tiny jitter third so a polygon
+      ## can be made
+      if(nrow(ptt_mgroup)<3){
+        temp<-ptt_mgroup[2,]
+        temp$long<-temp$long+0.0001
+        ptt_mgroup<-rbind(ptt_mgroup, temp)
+        }
+      ###!!!
     
       ptt_mgroup.sp<-SpatialPoints(cbind(ptt_mgroup$long,ptt_mgroup$lat),
                             proj4string= CRS("+proj=longlat +datum=WGS84"))
       
       ########## Drops stopovers with only two locations ########
-      if(nrow(unique(ptt_mgroup.sp@coords))<3){next}
+      #if(nrow(unique(ptt_mgroup.sp@coords))<3){next}
       ###########################################################
       
       ptt_mgroup.ch<-gConvexHull(ptt_mgroup.sp)
       
       ptt_mgroup.spdf<-SpatialPolygonsDataFrame(ptt_mgroup.ch, data=
-                       data.frame(ptt=i, mgroup=j, 
-                                  SO_start=min(ptt_mgroup$timestamp),
-                                  SO_end=max(ptt_mgroup$timestamp),
-                                  SO_days=unique(ptt_mgroup$LOS)))
+                       data.frame(ptt=i, mgroup=j, year=unique(ptt_mgroup$year),
+                                  SO_start=unique(ptt_mgroup$SO_startDOY),
+                                  SO_end=unique(ptt_mgroup$SO_endDOY),
+                                  SO_days=unique(ptt_mgroup$SO_days)))
       
       ptt_mgroup.spdf@polygons[[1]]@ID<-paste(i, j, sep=".")
       row.names(ptt_mgroup.spdf@data)<-paste(i, j, sep=".")
@@ -98,14 +160,12 @@ for(i in birds)
 plot(stopovers_spdf)
 map("world", add=T, col="grey")
 
-plot(stopovers_spdf[stopovers_spdf$stopover_duration>3,], add=T, col=2)
-
 library(rgdal)
 
 # need to do setwd() to level below dsn for linux??
-setwd("~/BTO/cuckoo_tracking/data")
+setwd("C:/cuckoo_tracking/data")
 writeOGR(obj=stopovers_spdf, dsn="spatial",
-         layer="movebank_cuckoos_bestofday_stopovers", driver="ESRI Shapefile",
+         layer="stopover_bestofday_2018_1daymin_recalc_spring_mig_detailcoords", driver="ESRI Shapefile",
          overwrite_layer = T)
   
 
@@ -115,7 +175,7 @@ if(Sys.info()['nodename']=="D9L5812"){
   setwd("C:/cuckoo_tracking")}else{
     setwd("N:/cuckoo_tracking")}
 
-dat<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_clean_stopovers_recalc.csv", h=T)
+dat<-read.csv("data/processed_movebank_cuckoos_hybrid_filter_bestofday_2018_clean_stopovers_recalc.csv", h=T)
 
 # FORMAT!!
 dat$timestamp <- as.POSIXct(strptime(dat$timestamp, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -176,7 +236,7 @@ for(i in birds)
   
 }  
 
-write.csv(stopovers_tab, "data/stopover_table_bestofday_1daymin_recalc.csv", quote=F, row.names=F)
+write.csv(stopovers_tab, "data/stopover_table_bestofday_2018_1daymin_recalc.csv", quote=F, row.names=F)
 
 # Add country and biome data to stopovers
 
@@ -189,7 +249,7 @@ library(ggplot2)
 library(ggmap)
 
 # using best of day data
-dat<-read.csv("data/stopover_table_biomes_1daymin_recalc.csv", h=T)
+dat<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc.csv", h=T)
 
 setwd("sourced_data/")
 countries<-readOGR(layer="TM_WORLD_BORDERS-0.3",
@@ -246,22 +306,72 @@ dat$biome1<-gsub(",", "", dat$biome1)
 
 dat$biome2<-gsub(",", "", dat$biome2)
 
-write.csv(dat, "data/stopover_table_bestofday_1daymin_recalc_biomes.csv", quote=F, row.names=F)
+write.csv(dat, "data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", quote=F, row.names=F)
 
 ## Add columns with migration cohort to 
 ## sort the issue of crossing years on migration manually in excel
+
+## cleaning up data for Durham uni provision
+
+dat<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
+
+# remove unhelpful median rounded month and year
+
+dat$SO_month<-NULL
+dat$SO_year<-NULL
 
 ## Manual fill of NA countries from GIS lookup
 
 dat[which(is.na(dat$country)),]
 dat[2,]$country<-'Belgium'
 dat[c(426,442),]$country<-'United Kingdom'
-dat[c(426,442),]$country<-'United Kingdom'
 dat[193,]$country<-'Netherlands'
 dat[207,]$country<-'United Kingdom'
-dat[833,]$country<-'United Kingdom'
-dat[568,]$country<-'Spain'
+dat[846,]$country<-'United Kingdom'
 dat[570,]$country<-'United Kingdom'
+
+#add julian
+
+dat$SO_start <- as.POSIXct(strptime(dat$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat$SO_end <- as.POSIXct(strptime(dat$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+library(lubridate)
+
+dat$SO_startDOY<-yday(dat$SO_start) 
+
+dat$SO_endDOY<-yday(dat$SO_end) 
+
+dat$SO_length_hr<-dat$SO_days*24
+
+dat$SO_length_discrete_day<-(dat$SO_endDOY-dat$SO_startDOY)+1
+
+dat[dat$SO_length_discrete_day<0  & 
+      substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_length_discrete_day<-365-
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_startDOY)+
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2011', '2013','2014','2015','2017'),]$SO_endDOY)+1
+
+# for leap years
+dat[dat$SO_length_discrete_day<0  & 
+      substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_length_discrete_day<-366-
+  (dat[dat$SO_length_discrete_day<0  & 
+        substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_startDOY)+
+  (dat[dat$SO_length_discrete_day<0  & 
+         substr(dat$SO_start, 1,4)%in% c('2012', '2016'),]$SO_endDOY)+1
+
+# remove erroneous stopovers (<1.5d) from skipped duty cycle
+
+dat[dat$SO_length_discrete_day<3,]
+
+dat<-dat[dat$SO_length_discrete_day>2,]
+
+dat$SO_days<-NULL # remove
+
+# now do manual edit to sort final death stopovers in excel
+write.csv(dat, "data/stopover_table_bestofday_2018_1daymin_recalc_biomes_EXPORT.csv", quote=F, row.names=F)
+
+
 
 # Exporting as KML files 
 

@@ -18,9 +18,44 @@ if(Sys.info()['nodename']=="D9L5812"){
 # Load non best-of-day data which has stopover defined as >= 1 day
 
 
-dat2<-read.csv("data/stopover_table_bestofday_1daymin_recalc_biomes.csv", h=T)
+dat2<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
 
 UK_travel<-read.csv("data/complete_cycles_UK_all_timing.csv", h=T)
+
+# manually add 4 columns for 2018 spring migration birds. As only best of day 
+# data downloaded for 2018 entry datestime is estimated from movebank
+# We drop Peckham as he hasnt turned up in 2018
+# rows 1-4 are: PJ, Selborne, Victor, Larry
+
+arr_2018<-data.frame(ptt=c(161318, 161321, 161324, 146759), 
+                     year=2018, 
+                     UK_entry=c('2018-04-17 08:19:09',
+                                '2018-04-14 06:15:32',
+                                '2018-04-20 11:06:42',
+                                '2018-05-08 05:25:51'),
+                     UK_exit= NA,
+                     deployment_entry=FALSE,
+                     unreliable_exit=TRUE,
+                     breeding_entry=c('2018-04-17 08:19:09',
+                                      '2018-04-14 06:15:32',
+                                      '2018-04-20 11:06:42',
+                                      '2018-05-08 05:25:51'),
+                     breeding_exit= NA, 
+                     UK_entryHACK=c('2000-04-17',
+                                    '2000-04-14',
+                                    '2000-04-20',
+                                    '2000-05-08'),
+                     breeding_entryHACK=c('2000-04-17',
+                                          '2000-04-14',
+                                          '2000-04-20',
+                                          '2000-05-08'),
+                     UK_br_diff_days=0)
+
+
+# add in the 2018 data
+
+UK_travel<-rbind(UK_travel, arr_2018)
+
 
 #UK_travel<-UK_travel[UK_travel$deployment_entry==FALSE,]
 
@@ -33,7 +68,7 @@ dat2$SO_year=as.numeric(substr(dat2$SO_start, 1,4))
 
 dat2<-rename(dat2, c("SO_year" = "year"))
 
-d2<-join_all(list(dat2, UK_travel), by=c("ptt", "year"))
+d2<-plyr::join_all(list(dat2, UK_travel), by=c("ptt", "year"))
 
 # this line subsets birds and years that I want to exclude from the 
 # the analyses i.e they do not complete a full cycle
@@ -97,12 +132,90 @@ d4$is_spring_mig<-NULL
 d4$deployment_entry<-NULL
 d4$unreliable_exit<-NULL
 # write out data
-write.csv(d4, "data/stopover_bestofday_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
+write.csv(d4, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", quote=F, row.names=F)
+
+
+#### to make d2 for birds that died ####
+
+dat2<-read.csv("data/stopover_table_bestofday_2018_1daymin_recalc_biomes.csv", h=T)
+
+dat2$SO_start <- as.POSIXct(strptime(dat2$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
+dat2$SO_end <- as.POSIXct(strptime(dat2$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
+
+library(plyr)
+
+#re-define year so that it is the year that the stopover starts in
+dat2$SO_year=as.numeric(substr(dat2$SO_start, 1,4))
+
+dat2<-rename(dat2, c("SO_year" = "year"))
+
+dat2$UK_entry<-NA
+dat2$UK_exit<-NA
+dat2$breeding_entry<-NA
+dat2$breeding_exit<-NA
+dat2$UK_br_diff_days<-NA
+
+library(lubridate)
+
+dat2$SO_startDOY<-yday(
+  dat2$SO_start) 
+
+dat2$SO_endDOY<-yday(
+  dat2$SO_end) 
+
+
+
+dead_cucks=data.frame(ptt=c(62518,62520,62602,11597,11599,128296,128303,161323,134958,128300),
+                      year_died=c(2012,2012,2012,2013,2014,2014,2014,2017,2015,2015), 
+                      done_dead='yarp')
+
+d2<-plyr::join_all(list(dat2, dead_cucks), by=c("ptt"))
+
+d2<-d2[-which(is.na(d2$done_dead)),]
+
+# all birds except livingstone were tagged the summer before they died
+d2<-d2[-which(d2$ptt==128300 & d2$year==2013),]
+
+d2<-rename(d2, c("year_died" = "mig_cohort"))
+
+d2$SO_month<-NULL
+
+
+dt_of_min_lat<-ddply(d2, .(ptt, mig_cohort), .fun =
+                       function(x){c(x[x$SO_median_lat==min(x$SO_median_lat),]$SO_start,
+                                     x[x$SO_median_lat==min(x$SO_median_lat),]$SO_end)})
+
+d2.5<-join_all(list(d2, dt_of_min_lat), by=c("ptt", "mig_cohort"))
+
+d2.5<-rename(d2.5, c("V1"="winterSO_start",
+                     "V2"="winterSO_end"))
+
+d2.5$is_spring_mig<-d2.5$year==d2.5$mig_cohort
+
+d4<-d2.5[d2.5$is_spring_mig==TRUE,]
+
+d4$is_spring_mig<-NULL
+d4$done_dead<-NULL
+
+write.csv(d4, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_dead.csv", quote=F, row.names=F)
+
+
+########################################
 
 
 # NOW create master file, 1 row per bird and migration 
 
-d4<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig.csv", h=T)
+d4<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig.csv", h=T)
+d4$dead=0
+
+d4_dead<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_dead.csv", h=T)
+d4_dead$dead=1
+
+d4_dead$biome1<-NULL
+d4_dead$biome2<-NULL
+
+
+d4<-rbind(d4, d4_dead)
 
 d4$SO_start <- as.POSIXct(strptime(d4$SO_start, "%Y-%m-%d %H:%M:%S"), "UTC")
 d4$SO_end <- as.POSIXct(strptime(d4$SO_end, "%Y-%m-%d %H:%M:%S"), "UTC")
@@ -151,16 +264,16 @@ nrow(d4[d4$SO_days<3,]) # old appraoch lost ~ 25% of stopovers
 
 # OK now just want last stopover in west africa before bird flew
 
-out_tab<-ddply(d4, .(ptt, year, region), summarize,
+out_tab<-ddply(d4, .(ptt, year, dead, region), summarize,
                depart=max(SO_end), no_SO=length(SO_end),
                sum_SO=sum(SO_days), minlongWA=min(SO_median_long))
 
-out2<-ddply(d4, .(ptt, year), summarize, depart_winterSO=unique(winterSO_end),
+out2<-ddply(d4, .(ptt, year, dead), summarize, depart_winterSO=unique(winterSO_end),
             arrive_uk=unique(UK_entry), arrive_breeding=unique(breeding_entry))
             
 
 out2.5<-join_all(list(out2, out_tab[out_tab$region=="Central Africa",]),
-               by=c("ptt", "year"))
+               by=c("ptt", "year", 'dead'))
 out2.5$region<-NULL
 out2.5$minlongWA<-NULL
 out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
@@ -168,7 +281,7 @@ out2.5<-rename(out2.5, c("depart"="DEPcentralAF",
                      "sum_SO"="sumSOcentralAF"))
 
 out3<-join_all(list(out2.5, out_tab[out_tab$region=="West Africa",]),
-                 by=c("ptt", "year"))
+                 by=c("ptt", "year", 'dead'))
 
 out3$region<-NULL
 out3<-rename(out3, c("depart"="DEPwestAF",
@@ -177,7 +290,7 @@ out3<-rename(out3, c("depart"="DEPwestAF",
                      'minlongWA'='minlongwestAF'))
 
 out3.5<-join_all(list(out3, out_tab[out_tab$region=="North Africa",]),
-               by=c("ptt", "year"))
+               by=c("ptt", "year", 'dead'))
 
 out3.5$region<-NULL
 out3.5$minlongWA<-NULL
@@ -186,7 +299,7 @@ out3.5<-rename(out3.5, c("depart"="DEPnorthAF",
                      "sum_SO"="sumSOnorthAF"))
 
 out4<-join_all(list(out3.5, out_tab[out_tab$region=="Europe",]),
-                 by=c("ptt", "year"))
+                 by=c("ptt", "year", 'dead'))
 
 out4$region<-NULL
 out4$minlongWA<-NULL
@@ -201,7 +314,7 @@ strategy.dat <- read.csv("t_drive/scripts/cuckoo migratory strategy and Sahara c
 
 
 out5<-join(x=out4, y=data.frame(ptt=strategy.dat$tag, 
-                                breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
+                      breeding_loc=strategy.dat$capture.location),by="ptt", match="first")
 
 out6<-join_all(list(out5, data.frame(ptt=strategy.dat$tag, year=strategy.dat$year, 
                                     autumn_mig=strategy.dat$migratory.strategy)),
@@ -266,16 +379,16 @@ out6$arrive_breeding <- yday(out6$arrive_breeding)
 
 library(dplyr)
 
-out6<-out6 %>% select(ptt, year, depart_winterSO, DEPcentralAF,
+out6<-out6 %>% select(ptt, year,dead, depart_winterSO, DEPcentralAF,
                 DEPwestAF, DEPnorthAF, DEPeurope, arrive_uk, arrive_breeding,
                 noSOcentralAF, sumSOcentralAF, noSOwestAF, sumSOwestAF, 
                 noSOnorthAF, sumSOnorthAF,noSOeurope, sumSOeurope,minlongwestAF, breeding_loc,
                 autumn_mig)
 
 # make stopovers duration and numer a zero when they don't occur
-out6[,10:17][is.na(out6[,10:17])]<-"0"
+out6[,11:18][is.na(out6[,11:18])]<-"0"
 
-write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", quote=F, row.names=F)
+write.csv(out6, "data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", quote=F, row.names=F)
 
 
 ##################################################
@@ -283,7 +396,7 @@ write.csv(out6, "data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv",
 ##################################################
 
 
-dat<-read.csv("data/stopover_bestofday_1daymin_recalc_spring_mig_summary.csv", h=T)
+dat<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead.csv", h=T)
 
 ### summarise the data
 
@@ -404,6 +517,19 @@ summary(lmer(arrive_breeding~factor(ptt)+
         (1|year), data=dat[dat$ptt %in% names(which(table(dat$ptt)>1)),]))
 
 # Does arrival at breeding location depend on african departures
+
+# describe first
+
+dat$WA_mig_len<-dat$arrive_breeding-dat$DEPwestAF
+
+qplot(data=dat, x=year, y=WA_mig_len)
+
+qplot(data=dat, x=year, y=WA_mig_len, colour=breeding_loc)+facet_wrap(~year)
+
+# faster migration in 2015 for all birds
+
+qplot(data=dat, x=DEPwestAF, y=WA_mig_len, colour=breeding_loc)+facet_wrap(~year)
+
 
 m4<-lmer(arrive_breeding~depart_winterSO+
            DEPcentralAF+DEPwestAF+
@@ -620,3 +746,19 @@ Anova(SOc, test.statistic = 'F')
 SOne<-lmer(sumSOeurope~sumSOnorthAF+factor(year)+
             (1|ptt), data=dat)
 Anova(SOne, test.statistic = 'F')
+
+
+
+# extra analyses  25/04
+
+qplot(data=dat, y=arrive_breeding, x=breeding_loc)+geom_point(data=dat, aes(y=arrive_uk, x=breeding_loc), shape=2)+geom_point(data=dat, aes(y=DEPwestAF,x=breeding_loc), shape=3)+facet_wrap(~year)+theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5))+geom_text(data=dat, aes(y=DEPwestAF+2,x=breeding_loc, label=arrive_breeding-DEPwestAF), nudge_x=0.5)+geom_text(data=dat, aes(y=arrive_breeding+2,x=breeding_loc, label=ptt), size=3)
+
+library(dplyr)
+
+
+d5<-d4 %>% group_by(ptt, year, region) %>% summarise(last_c=last(country))
+
+qplot(data=dat2, y=DEPwestAF, x=last_c, col=factor(year))
+
+
+

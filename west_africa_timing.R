@@ -11,7 +11,7 @@ library(readxl)
 
 # read the xlsx file as it has manually corrected country column
 # and has the mig_cohort column added
-dat<-read_excel("~/BTO/cuckoo_tracking/data/stopover_table_bestofday_biomes_Chris.xlsx")
+dat<-read_excel("C:/cuckoo_tracking/data/stopover_table_bestofday_biomes_Chris.xlsx")
 
 
 # these cuckoos complete at least one annual migration
