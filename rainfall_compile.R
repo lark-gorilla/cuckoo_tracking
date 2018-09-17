@@ -265,9 +265,9 @@ for(i in 1:123)
 
 #### big one
 
-ani.options(ani.width=1000, ani.height=1000)
+ani.options(ani.width=2000, ani.height=2000)
 
-saveGIF({
+saveHTML({
   for(i in 1:110)
   {
     
@@ -394,6 +394,9 @@ saveGIF({
      
      
      ras1<-subset(r2013,i)
+     
+     if(i==87){ras1<-subset(r2013,86)}
+     # hack to exclude erreroneous image
      
      if(i==1){cumra13<-ras1}else{cumra13<-cumra13+ras1}
      
@@ -715,7 +718,7 @@ saveGIF({
   }
   print(i)
   
-}, interval=1, "outputs/rainfall_stopoversALL.gif")
+}, interval=1, img.name="rplot", htmlfile="rainfall_stopoversALL.html")
 
 
 
