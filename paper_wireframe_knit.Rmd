@@ -25,6 +25,7 @@ library('MuMIn')
 library('raster')
 library('rgdal')
 library('dplyr')
+library('reshape2')
 
 
 if(Sys.info()['nodename']=="D9L5812"){
@@ -149,6 +150,10 @@ dmodWA<-dmodWA[,c(1,2,6,20,22,27,28,29,37,39,52,57,63,74,85,87,92, 115)]
 
 dmodWA<-na.omit(dmodWA)
 
+# read in final dataset
+datfinal<-read.csv("data/stopover_bestofday_2018_1daymin_recalc_spring_mig_summary_dead_final.csv", h=T)
+
+
 ```
 
 ## Aims
@@ -171,9 +176,8 @@ Arrival at UK breeding grounds is less correlated with earlier stages of spring 
 
 ```{r, echo=F, fig.cap='Correlation between arrival at UK breeding grounds and stages of spring migration: departure from furthest southerly wintering latitude (pink); Central Africa (cyan); West Africa (blue); North Africa (green); Europe (red); and arrival on UK mainland (black).', warning=F, message=F}
 
-ggplot(data=dat, aes(y=arrive_breeding))+
+ggplot(data=datfinal, aes(y=arrive_breeding))+
   geom_point(aes(x=arrive_uk), col=1, shape=1)+
-  geom_point(aes(x=DEPeurope), col=2, shape=1)+
   geom_point(aes(x=DEPnorthAF), col=3, shape=1)+
   geom_point(aes(x=DEPwestAF), col=4, shape=1)+
   geom_point(aes(x=DEPcentralAF), col=5, shape=1)+
@@ -184,40 +188,155 @@ ggplot(data=dat, aes(y=arrive_breeding))+
 ```
 
 
-Stats confirm that date of departure from West Africa significantly impacts subsequent date of arrival at Uk breeding grounds, but prior stages of spring migration do not.
+Stats confirm that date of departure from West Africa significantly impacts subsequent date of arrival at UK breeding grounds, but prior stages do not. *Note after reanalyses of departure from central africa we see that it is significant upon arrival at UK breeding grounds, but not highly so*
 
 
 ```{r, echo=F}
-d1<-dat
-  names(d1)[10]<-'arrive.breeding.uk'
-  names(d1)[4]<-'depart.wintering'
-  names(d1)[5]<-'depart.central.africa'
-  names(d1)[6]<-'depart.west.africa'
+m1<-lmer(arrive_breeding~arrive_uk+(1|breeding_hab/ptt)+(1|year), data=datfinal)
+m2<-lmer(arrive_breeding~DEPnorthAF+(1|breeding_hab/ptt)+(1|year), data=datfinal)
+m3<-lmer(arrive_breeding~DEPwestAF+(1|breeding_hab/ptt)+(1|year), data=datfinal)
 
-m1<-lmer(arrive.breeding.uk~depart.wintering+depart.central.africa+depart.west.africa+(1|year)+(1|ptt), data=d1)
+m5<-lmer(arrive_breeding~DEPcentralAF+(1|breeding_hab/ptt)+(1|year), data=datfinal)
+m6<-lmer(arrive_breeding~depart_winterSO+(1|breeding_hab/ptt)+(1|year), data=datfinal)
 
+'Arrival at UK border'
 Anova(m1, test.statistic='F')
+'Arrival in Europe'
+Anova(m2, test.statistic='F')
+'Depart West Africa'
+Anova(m3, test.statistic='F')
+'Depart Central Africa'
+Anova(m5, test.statistic='F')
+'Depart wintering grounds'
+Anova(m6, test.statistic='F')
+
 
 ```
 
-
-For every extra day departure from West Africa is delayed cuckoos arrive 0.78 days later back at UK breeding grounds.
+Looking at explanatory power (r2), we can see that the there is a large increase in explanatory power between departing Central Africa and departing West AFrica
 
 
 ```{r, warning=F, message=F, echo=F}
+'Arrival at UK border'
+r.squaredGLMM(m1)
+'Arrival in Europe'
+r.squaredGLMM(m2)
+'Depart West Africa'
+r.squaredGLMM(m3)
+'Depart Central Africa'
+r.squaredGLMM(m5)
+'Depart wintering grounds'
+r.squaredGLMM(m6)
+
+```
+
+Explanatory power of models does not scale linearly with time, more an exponential relationship
+
+```{r, warning=F, message=F, echo=F}
+
+lin_r2<-data.frame(day=1:120, simr2=seq(0,1, length.out=120))
+
+dpred<-rbind(data.frame(t(data.frame(r.squaredGLMM(m1)))),
+             data.frame(t(data.frame(r.squaredGLMM(m2)))),
+             data.frame(t(data.frame(r.squaredGLMM(m3)))),
+             data.frame(t(data.frame(r.squaredGLMM(m5)))),
+             data.frame(t(data.frame(r.squaredGLMM(m6)))))
+dpred$mod<-c('Arrival at UK border',
+             'Arrival in Europe',
+             'Depart West Africa',
+             'Depart Central Africa',
+             'Depart wintering grounds')
+
+dpred$day=c(median(datfinal$arrive_uk, na.rm=T),
+            median(datfinal$DEPnorthAF, na.rm=T),
+            median(datfinal$DEPwestAF, na.rm=T),
+            median(datfinal$DEPcentralAF, na.rm=T),
+            median(datfinal$depart_winterSO, na.rm=T))
+            
+
+qplot(data=lin_r2, x=day, y=simr2, geom='line')+
+  geom_point(data=dpred, aes(x=day, y=R2m), colour='red')+
+  geom_text(data=dpred, aes(x=day, y=R2m, label=mod),
+            nudge_y=-0.05)+ylab('Explanatory power (r2)')
+```
+
+Exploring the residuals for each of migration stage against arrival at breeding ground models. As expected residual variance increases further back in time,
+
+```{r, warning=F, message=F, echo=F}
+dfresid<-rbind(data.frame(residuals=resid(m1, type='pearson'),
+                    mig_region='UK arrive'), 
+               data.frame(residuals=resid(m2, type='pearson'),
+                          mig_region='Europe arrive'), 
+               data.frame(residuals=resid(m3, type='pearson'),
+                          mig_region='West Africa depart'), 
+               data.frame(residuals=resid(m5, type='pearson'),
+                          mig_region='Central Africa depart'), 
+               data.frame(residuals=resid(m6, type='pearson'),
+                          mig_region='Wintering depart'))
+               
+
+ggplot(data=dfresid, aes(x=mig_region, y=residuals))+geom_jitter(shape=1, width=0.05)+
+  geom_hline(yintercept=0, colour='red', linetype=2)+
+  labs(x='Migration milestone', y='Residuals')+
+  scale_y_continuous(breaks=c(-15, -10, -5, 0, 5, 10, 15, 20, 25))+theme(axis.text.x=element_text(angle=90))
+```
+
+Partitioning the residual variance into certain regions allows us to see if different factors explain variance in certain regions, for example upland birds seem to travel faster through Europe than lowland birds.
+
+```{r, warning=F, message=F, echo=F}
+datfinal_nona<-na.omit(datfinal)
+
+m1<-lmer(arrive_breeding~arrive_uk+(1|breeding_hab/ptt)+(1|year), data=datfinal_nona)
+m2<-lmer(arrive_breeding~DEPnorthAF+(1|breeding_hab/ptt)+(1|year), data=datfinal_nona)
+m3<-lmer(arrive_breeding~DEPwestAF+(1|breeding_hab/ptt)+(1|year), data=datfinal_nona)
+
+m5<-lmer(arrive_breeding~DEPcentralAF+(1|breeding_hab/ptt)+(1|year), data=datfinal_nona)
+m6<-lmer(arrive_breeding~depart_winterSO+(1|breeding_hab/ptt)+(1|year), data=datfinal_nona)
+
+
+datfinal_nona$r.arriveUK<-resid(m1, type='pearson')
+datfinal_nona$r.arriveEU<-resid(m2, type='pearson')
+datfinal_nona$r.departWA<-resid(m3, type='pearson')
+datfinal_nona$r.departCA<-resid(m5, type='pearson')
+datfinal_nona$r.departWI<-resid(m6, type='pearson')
+
+#attrib variance to regions
+
+datfinal_nona$var.UK<-datfinal_nona$r.arriveUK
+datfinal_nona$var.europe<-datfinal_nona$r.arriveEU-datfinal_nona$r.arriveUK
+datfinal_nona$var.Sahara<-datfinal_nona$r.departWA-datfinal_nona$r.arriveEU
+datfinal_nona$var.Wafrica<-datfinal_nona$r.departCA-datfinal_nona$r.departWA
+datfinal_nona$var.Cafrica<-datfinal_nona$r.departWI-datfinal_nona$r.departCA
+
+var_yr<-melt(datfinal_nona[,c(2,12,19:23)], id.vars=c('year', 'breeding_hab'))
+
+qplot(data=var_yr, x=variable, y=value, colour=breeding_hab, geom='boxplot')+labs(y='migration speed (residual variance)', x='region')+theme(axis.text.x=element_text(angle=90))
+
+```
+
+Year can also explain some variance, for example in 2012 birds seem to move through all regions comparatbely faster than in other years.
+
+```{r, warning=F, message=F, echo=F}
+qplot(data=var_yr, x=variable, y=value, colour=factor(year), geom='boxplot')+labs(y='migration speed (residual variance)', x='region')+theme(axis.text.x=element_text(angle=90))
+```
+
+Back to the relationship between west africa and uk breeding: For every extra day departure from West Africa is delayed cuckoos arrive 0.78 days later back at UK breeding grounds.
+
+```{r, warning=F, message=F, echo=F}
+ 
 m4<-lmer(arrive_breeding~DEPwestAF+
            (1|ptt)+(1|year), data=dat)
 
-
 newdat<-data.frame(DEPwestAF=70:130, arrive_breeding=1)
 newdat$p1<-predict(m4, newdata=newdat, re.form=~0)
-
-predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
+ predmat<-model.matrix(arrive_breeding~DEPwestAF, data=newdat)
 vcv<-vcov(m4)
 semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
 newdat$lc<-newdat$p1-semod*1.96
 newdat$uc<-newdat$p1+semod*1.96
 
+	
+ 
 qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
   geom_line(data=newdat, aes(x=DEPwestAF, y=p1), colour='red')+
   geom_line(data=newdat, aes(x=DEPwestAF, y=lc), colour='red', linetype='dashed')+
@@ -227,12 +346,12 @@ qplot(data=dat, x=DEPwestAF, y=arrive_breeding)+
   theme_bw()
 ```
 
-
-Cuckoos that departed West Africa early had longer migrations back to the breeding grounds but those that departed after median departure date (day 102) could not compensate for delayed departure with faster migration.
+cuckoos that departed West Africa early had longer migrations back to the breeding grounds but those that departed after median departure date (day 102) could not compensate for delayed departure with faster migration.
 
 
 ```{r, warning=F, message=F, echo=F}
-d1$migration.length<-d1$arrive.breeding.uk-d1$depart.west.africa
+
+dat$migration.length<-dat$arrive_breeding-dat$DEPwestAF
 
 #m5<-lmer(migration.length~depart.west.africa+(1|ptt)+(1|year), data=d1)
 
@@ -250,7 +369,7 @@ d1$migration.length<-d1$arrive.breeding.uk-d1$depart.west.africa
 #newdat$p1<-predict(m5b, newdata=newdat, re.form=~0)
 
 
-qplot(data=d1, x=depart.west.africa, y=migration.length)+
+qplot(data=dat, x=DEPwestAF, y=migration.length)+
   xlab("Departure date West Africa (DOY)")+
   ylab("Migration length (days)")+
   theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=3.54, p=0.046', x = -Inf, y = Inf), hjust = 0, vjust = 1)
@@ -452,8 +571,6 @@ Plotted against arrival date into the UK, faded circles are individual bird arri
 ```{r, warning=F, message=F, echo=F}
 dmod2<-left_join(dmod, pop_trend, by=c('breeding_loc'='tagloc'))
 # warning ok
-
-qplot(data=dmod2, y=arrive_breeding, x=mean_diff, colour=breeding_loc)
 
 dmod3<-dmod2 %>% group_by(breeding_loc) %>% summarise_all(mean, na.rm=T)
 
@@ -726,73 +843,3 @@ ggplot() +
 
 
 ```
-
-
-
-Habitat Variables
-Habitat of the final stopover before departure from West Africa does not seem to have a huge imapact.
-The percentage of tree cover does not affect departure date.
- 
-```{r, warning=F, message=F, echo=F} 
- m1<-lmer(DEPwestAF~Tree+(1|year)+(1|ptt), data=dat)
- #Anova(m1, test.statistic = 'F')
- ggplot(data=dat, aes(x=Tree, y=DEPwestAF ))+xlab("% tree cover of final stopover")+ylab("Departure date West Africa (DOY)")+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=0.27, p=0.609', x = -Inf, y = Inf), hjust = 0, vjust = 1) 
- ```
- The percentage of grass cover does appear to affect departure date. *Not sure how believeable this is*
- ```{r, warning=F, message=F, echo=F} 
-m1<-lmer(DEPwestAF~Grass+(1|year)+(1|ptt), data=dat)
- #Anova(m1, test.statistic = 'F')
- newdat<-data.frame(DEPwestAF=1, Grass=1:75)
-newdat$p1<-predict(m1, newdata=newdat, re.form=~0)
- predmat<-model.matrix(DEPwestAF~Grass, data=newdat)
-vcv<-vcov(m1)
-semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
-newdat$lc<-newdat$p1-semod*1.96
-newdat$uc<-newdat$p1+semod*1.96
- qplot(data=dat, y=DEPwestAF, x=Grass)+
-  geom_line(data=newdat, aes(x=Grass, y=p1), colour='red')+
-  geom_line(data=newdat, aes(x=Grass, y=lc), colour='red', linetype='dashed')+
-  geom_line(data=newdat, aes(x=Grass, y=uc), colour='red', linetype='dashed')+
-  ylab("Departure date West Africa (DOY)")+
-  xlab("% grass cover of habitat")+
-  theme_bw()+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=7.54, p=0.011', x = -Inf, y = Inf), hjust = 0, vjust = 1)
-```
- 
-Distance to rivers does not affect departure date.
- 
-```{r, warning=F, message=F, echo=F} 
- m1<-lmer(DEPwestAF~D_riv+(1|year)+(1|ptt), data=dat)
- #Anova(m1, test.statistic = 'F')
- ggplot(data=dat, aes(x=D_riv, y=DEPwestAF ))+xlab("Distance to nearest river (m)")+ylab("Departure date West Africa (DOY)")+geom_point(shape=1)+theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=0.39, p=0.531', x = -Inf, y = Inf), hjust = 0, vjust = 1) 
-``` 
- 
- 
-Dynamic environmental variables
-NDVI anomoly appears important. Greener final stopover sites allow earlier departure from West. *Now to test rainfall and greening in more detail*  
- 
-```{r, warning=F, message=F, echo=F}
- dat2.3<-dat2.2 %>% group_by(year, ptt) %>%
-  summarise_all(last)
- dat$year<-as.integer(dat$year)
- dat3<-full_join(dat, dat2.3, by=c('ptt', 'year'))
- m6<-lmer(DEPwestAF~aquaANOM+
-           (1|ptt)+(1|year), data=dat3)
- #summary(m6)
- # plot
- newdat<-data.frame(aquaANOM=seq(-0.1,0.15, 0.005), DEPwestAF=1)
-newdat$p1<-predict(m6, newdata=newdat, re.form=~0)
- predmat<-model.matrix(DEPwestAF~aquaANOM, data=newdat)
-vcv<-vcov(m6)
-semod<-sqrt(diag(predmat%*%vcv%*%t(predmat)))
-newdat$lc<-newdat$p1-semod*1.96
-newdat$uc<-newdat$p1+semod*1.96
- qplot(data=dat3, x=aquaANOM, y=DEPwestAF)+
-  geom_line(data=newdat, aes(x=aquaANOM, y=p1), colour='red')+
-  geom_line(data=newdat, aes(x=aquaANOM, y=lc), colour='red', linetype='dashed')+
-  geom_line(data=newdat, aes(x=aquaANOM, y=uc), colour='red', linetype='dashed')+
-  xlab("NDVI anomoly")+
-  ylab("Departure date West Africa (DOY)")+
-  theme_bw()+geom_label(data=data.frame(), aes(label = 'Anova F=4.65, p=0.038', x = -Inf, y = Inf), hjust = 0, vjust = 1)+theme(axis.text.x=element_text(angle=90))
- #Anova(m6, test.statistic = 'F')
-```
-

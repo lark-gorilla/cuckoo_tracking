@@ -483,7 +483,30 @@ r.squaredGLMM(m6)
 #just little idea to see if explanatory power is a simple function of time
 # or actually per region
 
-lin_r2<-seq(0.07,0.88, length.out=120)
+lin_r2<-data.frame(day=1:120, simr2=seq(0,1, length.out=120))
+
+dpred<-rbind(data.frame(t(data.frame(r.squaredGLMM(m1)))),
+             data.frame(t(data.frame(r.squaredGLMM(m2)))),
+             data.frame(t(data.frame(r.squaredGLMM(m3)))),
+             data.frame(t(data.frame(r.squaredGLMM(m5)))),
+             data.frame(t(data.frame(r.squaredGLMM(m6)))))
+dpred$mod<-c('Arrival at UK border',
+             'Arrival in Europe',
+             'Depart West Africa',
+             'Depart Central Africa',
+             'Depart wintering grounds')
+
+dpred$day=c(median(datfinal$arrive_uk, na.rm=T),
+            median(datfinal$DEPnorthAF, na.rm=T),
+            median(datfinal$DEPwestAF, na.rm=T),
+            median(datfinal$DEPcentralAF, na.rm=T),
+            median(datfinal$depart_winterSO, na.rm=T))
+            
+
+qplot(data=lin_r2, x=day, y=simr2, geom='line')+
+  geom_point(data=dpred, aes(x=day, y=R2m), colour='red')+
+  geom_text(data=dpred, aes(x=day, y=R2m, label=mod),
+            nudge_y=-0.05)
 
 median(dmod$DEPcentralAF, na.rm=T)
 lin_r2[70]
@@ -513,7 +536,7 @@ dmod_nona$var.Sahara<-dmod_nona$r.departWA-dmod_nona$r.arriveEU
 dmod_nona$var.Wafrica<-dmod_nona$r.departCA-dmod_nona$r.departWA
 dmod_nona$var.Cafrica<-dmod_nona$r.departWI-dmod_nona$r.departCA
 
-var_yr<-melt(dmod_nona[,c(2,19:23)], id.vars=c('year'))
+var_yr<-melt(dmod_nona[,c(2,12,19:23)], id.vars=c('year', 'breeding_hab'))
 
 qplot(data=var_yr, x=variable, y=value, colour=factor(year), geom='boxplot')
 
